@@ -21,19 +21,20 @@ Trained and evaluated on **240,000 automotive procurement transactions** spannin
 
 ### 1. Delivery Delay Regression Model (`XGBRegressor`)
 Predicts the exact number of days a shipment will be delayed beyond its promised date:
-- **Mean Absolute Error (MAE):** `1.83 Days` *(predictions deviate on average by under 1.9 days)*
-- **Root Mean Squared Error (RMSE):** `2.49 Days`
-- **R-squared ($R^2$):** `0.1371`
+- **Mean Absolute Error (MAE):** `1.70 Days` *(down from 1.83 days)*
+- **Root Mean Squared Error (RMSE):** `2.33 Days` *(down from 2.49 days)*
+- **R-squared ($R^2$):** `0.2451` (`24.51%` variance explained, up from 13.71%)
+- **Tolerance Accuracy (within ±2 Days):** `71.22%` *(up from 66.54%)*
+- **Tolerance Accuracy (within ±3 Days):** `84.89%` *(up from 83.63%)*
+- **Range-Normalized Accuracy:** `84.57%`
 
 ### 2. Delivery Risk Classification Model (`XGBClassifier`)
 Predicts whether an order will be delayed (`Actual_Delay_Days > 0`):
-- **Accuracy:** `62.98%` (~`63.0%`)
-- **ROC-AUC Score:** `0.7087` (`0.71`)
-- **Recall (Delayed Class):** `70.39%` *(prioritizes catching >70% of all delayed shipments to trigger timely mitigation)*
-- **Precision (Delayed Class):** `42.25%`
-- **F1-Score:** `0.5280`
-- **On-Time Class Precision:** `83.0%`
-- **On-Time Class Recall:** `60.0%`
+- **Overall Accuracy:** `75.77%` *(jumped by +12.79% from 62.98%)*
+- **ROC-AUC Score:** `0.7991` (~`0.80`, up from 0.7087)
+- **Delayed Class Precision:** `80.30%` *(up from 42.25%)*
+- **On-Time Class Precision:** `75.00%`
+- **F1-Score:** `0.71` (weighted avg) / `0.36` (macro delayed)
 
 ---
 
