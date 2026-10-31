@@ -133,6 +133,19 @@ def prepare_features(data):
 
     df["Calculated_Lead_Time"] = (df["Promised_Date"] - df["Order_Date"]).dt.days
 
+    # Supply chain physics & interaction ratios
+    df["Transit_Velocity"] = df["Distance_KM"] / (df["Calculated_Lead_Time"] + 1.0)
+    df["Volume_Stress"] = df["Quantity_Ordered"] / (df["Calculated_Lead_Time"] + 1.0)
+    df["Cost_Per_KM"] = df["Shipping_Cost"] / (df["Distance_KM"] + 1.0)
+    df["Lead_Time_Deficit"] = df["Calculated_Lead_Time"] - df["Order_Lead_Time_Days"]
+    df["Is_Month_End_Rush"] = (df["Order_Day"] >= 25).astype(int)
+    df["Is_Quarter_End_Rush"] = ((df["Order_Month"].isin([3, 6, 9, 12])) & (df["Order_Day"] >= 22)).astype(int)
+    df["Is_Weekend_Order"] = df["Order_DayOfWeek"].isin([5, 6]).astype(int)
+    df["Is_Weekend_Promised"] = df["Promised_DayOfWeek"].isin([5, 6]).astype(int)
+    df["Month_Sin"] = np.sin(2 * np.pi * df["Order_Month"] / 12.0)
+    df["Month_Cos"] = np.cos(2 * np.pi * df["Order_Month"] / 12.0)
+    df["Supplier_Risk_Velocity"] = (100.0 - df["Supplier_History_Delivery_Rate"]) * df["Transit_Velocity"]
+
     drop_cols = [
         "Shipment_ID",
         "Purchase_Order_ID",
