@@ -64,11 +64,24 @@ except Exception as e:
 def format_delay(delay_days):
     delay_days = max(float(delay_days), 0.0)
     if delay_days == 0:
-        return "On Time"
+        return "On Time", "Expected on schedule"
     total_hours = delay_days * 24.0
     if total_hours < 24.0:
-        return f"{total_hours:.1f} Hours Late"
-    return f"{delay_days:.2f} Days Late"
+        return f"{total_hours:.1f} Hours Late", f"{delay_days:.2f} Days"
+    return f"{delay_days:.1f} Days Late", f"{total_hours:.0f} Total Hours"
+
+
+def format_inr(val):
+    val = float(val)
+    if val >= 10000000:
+        cr = val / 10000000.0
+        return f"₹{val:,.0f}", f"₹{cr:.2f} Crore"
+    elif val >= 100000:
+        lakhs = val / 100000.0
+        return f"₹{val:,.0f}", f"₹{lakhs:.2f} Lakhs"
+    elif val > 0:
+        return f"₹{val:,.2f}", ""
+    return "₹0.00", ""
 
 
 def get_risk_badge(risk_level):
@@ -254,7 +267,7 @@ elif page == "Manual Purchase Order":
                 # SECTION: PREDICTION RESULTS
                 st.header("📊 Delivery & Operational Impact Assessment")
 
-                delay_str = format_delay(predicted_delay)
+                delay_headline, delay_sub = format_delay(predicted_delay)
                 delay_color = "#ef4444" if predicted_delay > 0 else "#22c55e"
 
                 risk_colors = {
@@ -266,23 +279,26 @@ elif page == "Manual Purchase Order":
 
                 stockout_color = "#ef4444" if loss_info["Stockout_Risk"] else "#22c55e"
                 loss_color = "#ef4444" if loss_info["Total_Production_Loss"] > 0 else "#22c55e"
+                loss_headline, loss_sub = format_inr(loss_info["Total_Production_Loss"])
+                downtime_hrs = loss_info.get("Production_Downtime_Hours", loss_info["Production_Downtime_Days"] * 24.0)
+                lost_shifts = loss_info.get("Lost_Shifts_8h", round(downtime_hrs / 8.0, 1))
 
-                # 4 Modern Responsive KPI Cards
+                # 4 Modern Responsive KPI Cards (Zero-truncation, high clarity)
                 card_cols = st.columns(4)
 
                 # Card 1: Delivery Delay
                 with card_cols[0]:
                     st.markdown(
                         f"""
-                        <div style="background: var(--secondary-background-color, #f8fafc); border: 1px solid rgba(128, 128, 128, 0.2); border-left: 4px solid {delay_color}; border-radius: 8px; padding: 14px 16px; min-height: 110px;">
+                        <div style="background: var(--secondary-background-color, #ffffff); border: 1px solid rgba(128, 128, 128, 0.2); border-left: 5px solid {delay_color}; border-radius: 10px; padding: 14px 16px; min-height: 120px; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
                             <div style="font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px;">
                                 ⏱️ Predicted Delay
                             </div>
-                            <div style="font-size: 20px; font-weight: 700; color: {delay_color}; margin: 6px 0 4px 0; line-height: 1.2;">
-                                {delay_str}
+                            <div style="font-size: 20px; font-weight: 700; color: {delay_color}; margin: 5px 0 2px 0; line-height: 1.25; word-break: break-word;">
+                                {delay_headline}
                             </div>
                             <div style="font-size: 12px; color: #64748b;">
-                                Arrival: <strong>{loss_info['Predicted_Arrival_Date'] or 'N/A'}</strong>
+                                Arrival: <strong>{loss_info['Predicted_Arrival_Date'] or 'N/A'}</strong> ({delay_sub})
                             </div>
                         </div>
                         """,
@@ -293,11 +309,11 @@ elif page == "Manual Purchase Order":
                 with card_cols[1]:
                     st.markdown(
                         f"""
-                        <div style="background: var(--secondary-background-color, #f8fafc); border: 1px solid rgba(128, 128, 128, 0.2); border-left: 4px solid {risk_color}; border-radius: 8px; padding: 14px 16px; min-height: 110px;">
+                        <div style="background: var(--secondary-background-color, #ffffff); border: 1px solid rgba(128, 128, 128, 0.2); border-left: 5px solid {risk_color}; border-radius: 10px; padding: 14px 16px; min-height: 120px; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
                             <div style="font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px;">
                                 🎯 Delivery Risk Tier
                             </div>
-                            <div style="font-size: 20px; font-weight: 700; color: {risk_color}; margin: 6px 0 4px 0; line-height: 1.2;">
+                            <div style="font-size: 20px; font-weight: 700; color: {risk_color}; margin: 5px 0 2px 0; line-height: 1.25; word-break: break-word;">
                                 {get_risk_badge(risk_tier)}
                             </div>
                             <div style="font-size: 12px; color: #64748b;">
@@ -312,15 +328,15 @@ elif page == "Manual Purchase Order":
                 with card_cols[2]:
                     st.markdown(
                         f"""
-                        <div style="background: var(--secondary-background-color, #f8fafc); border: 1px solid rgba(128, 128, 128, 0.2); border-left: 4px solid {stockout_color}; border-radius: 8px; padding: 14px 16px; min-height: 110px;">
+                        <div style="background: var(--secondary-background-color, #ffffff); border: 1px solid rgba(128, 128, 128, 0.2); border-left: 5px solid {stockout_color}; border-radius: 10px; padding: 14px 16px; min-height: 120px; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
                             <div style="font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px;">
                                 📦 Stock Coverage
                             </div>
-                            <div style="font-size: 20px; font-weight: 700; color: var(--text-color, #0f172a); margin: 6px 0 4px 0; line-height: 1.2;">
+                            <div style="font-size: 20px; font-weight: 700; color: var(--text-color, #0f172a); margin: 5px 0 2px 0; line-height: 1.25; word-break: break-word;">
                                 {loss_info['Stock_Coverage_Days']:.1f} Days
                             </div>
                             <div style="font-size: 12px; color: #64748b;">
-                                Depletes: <strong>{loss_info['Stockout_Date'] or 'N/A'}</strong>
+                                Depletion: <strong>{loss_info['Stockout_Date'] or 'N/A'}</strong>
                             </div>
                         </div>
                         """,
@@ -331,15 +347,15 @@ elif page == "Manual Purchase Order":
                 with card_cols[3]:
                     st.markdown(
                         f"""
-                        <div style="background: var(--secondary-background-color, #f8fafc); border: 1px solid rgba(128, 128, 128, 0.2); border-left: 4px solid {loss_color}; border-radius: 8px; padding: 14px 16px; min-height: 110px;">
+                        <div style="background: var(--secondary-background-color, #ffffff); border: 1px solid rgba(128, 128, 128, 0.2); border-left: 5px solid {loss_color}; border-radius: 10px; padding: 14px 16px; min-height: 120px; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
                             <div style="font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px;">
                                 🏭 Potential Production Loss
                             </div>
-                            <div style="font-size: 20px; font-weight: 700; color: {loss_color}; margin: 6px 0 4px 0; line-height: 1.2;">
-                                ₹{loss_info['Total_Production_Loss']:,.2f}
+                            <div style="font-size: 20px; font-weight: 700; color: {loss_color}; margin: 5px 0 2px 0; line-height: 1.25; word-break: break-word;">
+                                {loss_headline} <span style="font-size: 13px; font-weight: 600; color: #64748b;">{loss_sub}</span>
                             </div>
                             <div style="font-size: 12px; color: #64748b;">
-                                Plant Downtime: <strong>{loss_info['Production_Downtime_Days']:.1f} Days</strong>
+                                Downtime: <strong>{loss_info['Production_Downtime_Days']:.1f}d ({downtime_hrs:.0f}h / {lost_shifts} shifts)</strong>
                             </div>
                         </div>
                         """,
@@ -419,10 +435,11 @@ elif page == "Manual Purchase Order":
                                 <h3 style="color: #15803d; margin-top: 0;">Top Pick: Candidate {top_alt['Supplier ID']} ({top_alt['Item']})</h3>
                                 <p style="font-size: 15px; color: #166534; line-height: 1.5;">{top_alt['Explanation']}</p>
                                 <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-top: 12px; font-size: 14px; color: #14532d;">
+                                    <div>🎯 Suitability Match: <strong>{top_alt.get('Match Score', 'N/A')}</strong></div>
                                     <div>⏱️ Lead Time: <strong>{top_alt['Lead Time']}</strong></div>
                                     <div>📦 Available Qty: <strong>{top_alt['Available Quantity']} Units</strong> ({top_alt['Quantity_Status']})</div>
                                     <div>⭐ Supplier Rating: <strong>{top_alt['Supplier Rating']}</strong></div>
-                                    <div>🛡️ Downtime Prevented: <strong>{top_alt['Downtime_Prevented_Days']:.1f} Days</strong></div>
+                                    <div>🛡️ Downtime Prevented: <strong>{top_alt['Downtime_Prevented_Days']:.1f} Days ({top_alt['Downtime_Prevented_Days']*24.0:.0f} hrs)</strong></div>
                                     <div>💵 Loss Avoided: <strong>₹{top_alt['Loss_Avoided_INR']:,.2f}</strong></div>
                                     <div>📈 Net Financial Benefit: <strong>₹{top_alt['Net_Benefit_INR']:,.2f}</strong></div>
                                 </div>
@@ -436,6 +453,7 @@ elif page == "Manual Purchase Order":
                         required_headers = [
                             "Supplier ID",
                             "Item",
+                            "Match Score",
                             "Available Quantity",
                             "Lead Time",
                             "Quality",
@@ -489,7 +507,7 @@ elif page == "Manual Purchase Order":
                             "Scenario": scenarios_df["Scenario"],
                             "Supplier": scenarios_df["Supplier"],
                             "Expected Arrival Date": scenarios_df["Expected_Arrival_Date"],
-                            "Production Downtime": scenarios_df["Production_Downtime_Days"].apply(lambda x: f"{x:.1f} Days"),
+                            "Production Downtime": scenarios_df["Production_Downtime_Days"].apply(lambda x: f"{x:.1f} Days ({x*24.0:.0f} hrs)"),
                             "Lost Production Units": scenarios_df["Lost_Production_Units"].apply(lambda x: f"{x:,.0f} Units"),
                             "Estimated Production Loss": scenarios_df["Estimated_Production_Loss_INR"].apply(lambda x: f"₹{x:,.2f}"),
                             "Additional Procurement Cost": scenarios_df["Additional_Procurement_Cost_INR"].apply(lambda x: f"₹{x:,.2f}"),
@@ -607,9 +625,11 @@ elif page == "Bulk CSV Prediction":
                         c1, c2, c3 = st.columns(3)
                         total_stockouts = preds["Stockout_Risk"].sum()
                         total_batch_loss = preds["Total_Production_Loss"].sum()
+                        b_loss_primary, b_loss_sub = format_inr(total_batch_loss)
+                        loss_display = f"{b_loss_primary} ({b_loss_sub})" if b_loss_sub else b_loss_primary
                         c1.metric("Total Orders Evaluated", f"{len(preds):,}")
                         c2.metric("Orders with Stockout Risk", f"{total_stockouts:,} ({total_stockouts/len(preds)*100:.1f}%)")
-                        c3.metric("Total Potential Financial Loss", f"₹{total_batch_loss:,.2f}")
+                        c3.metric("Total Potential Financial Loss", loss_display)
 
                         st.subheader("Results Preview")
                         st.dataframe(preds.head(20), width="stretch")

@@ -196,24 +196,32 @@ def calculate_production_loss(
     daily_production,
     unit_cost,
     order_date=None,
-    promised_date=None
+    promised_date=None,
+    daily_fixed_overhead=0.0
 ):
     """
-    Computes stock coverage days, factory downtime, lost units, and financial loss in INR.
+    Computes stock coverage days, factory downtime, lost units, and dual-component
+    financial loss in INR with fractional-day and hourly resolution.
     Compares the expected delivery arrival date against the inventory stockout date.
     """
     delay = max(0.0, float(predicted_delay_days))
     stock = max(0.0, float(available_stock))
     cost = max(0.0, float(unit_cost))
     burn_rate = float(daily_production)
+    overhead = max(0.0, float(daily_fixed_overhead))
 
     if burn_rate <= 0:
         return {
             "Stock_Coverage_Days": float("inf"),
             "Production_Downtime_Days": 0.0,
+            "Production_Downtime_Hours": 0.0,
+            "Lost_Shifts_8h": 0.0,
             "Lost_Production_Units": 0.0,
             "Daily_Production_Loss": 0.0,
+            "Direct_Product_Loss": 0.0,
+            "Fixed_Overhead_Loss": 0.0,
             "Total_Production_Loss": 0.0,
+            "Buffer_Deficit_Units": 0.0,
             "Stockout_Risk": False,
             "Stockout_Date": None,
             "Predicted_Arrival_Date": None,
@@ -238,16 +246,26 @@ def calculate_production_loss(
         expected_delivery_date = None
         days_until_delivery = delay
 
+    downtime_hours = downtime_days * 24.0
+    lost_shifts = round(downtime_hours / 8.0, 1)
     lost_units = downtime_days * burn_rate
     daily_loss = burn_rate * cost
-    total_loss = lost_units * cost
+    direct_product_loss = lost_units * cost
+    fixed_overhead_loss = downtime_days * overhead
+    total_loss = direct_product_loss + fixed_overhead_loss
+    buffer_deficit_units = max(0.0, downtime_days * burn_rate)
 
     return {
         "Stock_Coverage_Days": round(stock_coverage_days, 2),
         "Production_Downtime_Days": round(downtime_days, 2),
+        "Production_Downtime_Hours": round(downtime_hours, 1),
+        "Lost_Shifts_8h": lost_shifts,
         "Lost_Production_Units": round(lost_units, 2),
         "Daily_Production_Loss": round(daily_loss, 2),
+        "Direct_Product_Loss": round(direct_product_loss, 2),
+        "Fixed_Overhead_Loss": round(fixed_overhead_loss, 2),
         "Total_Production_Loss": round(total_loss, 2),
+        "Buffer_Deficit_Units": round(buffer_deficit_units, 1),
         "Stockout_Risk": stockout_risk,
         "Stockout_Date": stockout_date.strftime("%Y-%m-%d") if stockout_date else None,
         "Predicted_Arrival_Date": expected_delivery_date.strftime("%Y-%m-%d") if expected_delivery_date else None,
@@ -267,11 +285,12 @@ def find_alternative_suppliers(
     top_n=5
 ):
     """
-    Ranks verified alternative suppliers using physical inventory timeline simulation:
-    1. Exact Item compatibility.
-    2. Ability to deliver before stockout.
-    3. Available quantity.
-    4. Delivery reliability and quality approval.
+    Ranks verified alternative suppliers using physical inventory timeline simulation
+    and Multi-Criteria Decision Analysis (MCDA) match scoring (0-100%):
+    1. Exact Item compatibility & Quality approval.
+    2. Ability to deliver before stockout (Downtime prevention).
+    3. Available quantity coverage.
+    4. Delivery reliability and quality rating.
     5. Net financial benefit (loss avoided - extra procurement cost).
     """
     engine = load_alternative_engine()
@@ -299,6 +318,7 @@ def find_alternative_suppliers(
 
     days_until_orig_delivery = max(0.0, (expected_orig_delivery - ord_dt).total_seconds() / 86400.0)
     orig_downtime_days = max(0.0, days_until_orig_delivery - stock_coverage_days)
+    loss_without_alt = orig_downtime_days * burn_rate * float(current_unit_cost)
 
     req_qty = float(required_quantity)
     curr_cost = float(current_unit_cost)
@@ -315,7 +335,6 @@ def find_alternative_suppliers(
         on_time_rate = float(row.get("Supplier_On_Time_Rate", 85.0))
         quality = str(row.get("Quality_Approved", "Yes"))
 
-        # Quantity constraints
         capacity = float(row.get("Supplier_Capacity", 999999.0))
         supplied_qty = min(req_qty, alt_available_qty, capacity)
 
@@ -324,16 +343,14 @@ def find_alternative_suppliers(
         else:
             qty_status = f"Partial ({alt_available_qty:,.0f} / {req_qty:,.0f} Units)"
 
+        qty_coverage_factor = min(1.0, alt_available_qty / req_qty) if req_qty > 0 else 1.0
+
         # Physical Timeline Simulation:
         if alt_lead_days >= days_until_orig_delivery:
-            # Arrives after original delivery
             alt_downtime_days = orig_downtime_days
             downtime_prevented = 0.0
         else:
-            # Unavoidable downtime between stockout and alternative arrival
             unavoidable_downtime = max(0.0, alt_lead_days - stock_coverage_days)
-
-            # Days of stock supplied by alternative
             alt_coverage_days = supplied_qty / burn_rate
             covered_until_days = max(stock_coverage_days, alt_lead_days) + alt_coverage_days
             remaining_downtime = max(0.0, days_until_orig_delivery - max(alt_lead_days, covered_until_days))
@@ -351,15 +368,34 @@ def find_alternative_suppliers(
 
         if arrives_before_stockout:
             feasibility = "Arrives Before Stockout (Prevents Shutdown)"
+            lead_score = 100.0
         elif downtime_prevented > 0:
             diff_days = max(1, (alt_delivery_date - stockout_date).days)
             feasibility = f"Arrives {diff_days}d after stockout, but shortens shutdown by {downtime_prevented:.1f}d"
+            lead_score = max(20.0, min(95.0, (downtime_prevented / max(orig_downtime_days, 0.1)) * 100.0))
         else:
             feasibility = "No Downtime Reduction (Arrives after original shipment)"
+            lead_score = 10.0
+
+        # MCDA 5-factor scoring (0-100%):
+        fin_ratio = net_benefit / max(loss_without_alt, 1.0) if loss_without_alt > 0 else 1.0
+        financial_score = max(0.0, min(100.0, fin_ratio * 100.0))
+        reliability_score = max(0.0, min(100.0, on_time_rate))
+        rating_score = max(0.0, min(100.0, rating * 20.0))
+        qty_score = min(100.0, qty_coverage_factor * 100.0)
+
+        mcda_score = (
+            0.35 * lead_score +
+            0.25 * financial_score +
+            0.20 * reliability_score +
+            0.10 * rating_score +
+            0.10 * qty_score
+        )
 
         candidates.append({
             "Supplier ID": row["Candidate_Supplier_ID"],
             "Item": f"{row['Item_ID']} - {row.get('Item_Name', '')}",
+            "Match Score": f"{mcda_score:.1f}%",
             "Available Quantity": f"{alt_available_qty:,.0f}",
             "Lead Time": f"{alt_lead_days:.0f} Days",
             "Quality": quality,
@@ -373,6 +409,7 @@ def find_alternative_suppliers(
             "Raw_Unit_Cost": alt_unit_cost,
             "Raw_Rating": rating,
             "Raw_On_Time_Rate": on_time_rate,
+            "Raw_MCDA_Score": round(mcda_score, 1),
             "Quantity_Status": qty_status,
             "Downtime_Prevented_Days": round(downtime_prevented, 2),
             "Loss_Avoided_INR": round(loss_avoided, 2),
@@ -384,8 +421,8 @@ def find_alternative_suppliers(
             "Alt_Production_Loss": round(alt_downtime_days * burn_rate * curr_cost, 2),
             "Feasibility": feasibility,
             "Explanation": (
-                f"Candidate {row['Candidate_Supplier_ID']} delivers in {alt_lead_days:.0f} days with "
-                f"{on_time_rate:.1f}% on-time reliability and {rating:.2f} rating. "
+                f"Candidate {row['Candidate_Supplier_ID']} achieves {mcda_score:.1f}% MCDA suitability score, "
+                f"delivering in {alt_lead_days:.0f} days with {on_time_rate:.1f}% on-time reliability and {rating:.2f} rating. "
                 f"Supplies {qty_status}. {feasibility}. "
                 f"Prevents {downtime_prevented:.1f} days downtime, avoiding ₹{loss_avoided:,.2f} in production loss "
                 f"with net financial benefit of ₹{net_benefit:,.2f}."
@@ -396,23 +433,16 @@ def find_alternative_suppliers(
     if res_df.empty:
         return pd.DataFrame()
 
-    # Prioritize:
-    # 1. Arrives before stockout
-    # 2. Maximum net financial benefit
-    # 3. Maximum downtime prevented
-    # 4. On-time delivery reliability
-    # 5. Supplier rating
-    # 6. Lowest total procurement cost
     res_df = res_df.sort_values(
         by=[
             "Arrives_Before_Stockout",
+            "Raw_MCDA_Score",
             "Net_Benefit_INR",
             "Downtime_Prevented_Days",
             "Raw_On_Time_Rate",
-            "Raw_Rating",
-            "Raw_Total_Cost"
+            "Raw_Rating"
         ],
-        ascending=[False, False, False, False, False, True]
+        ascending=[False, False, False, False, False, False]
     ).reset_index(drop=True)
 
     res_df.index = res_df.index + 1
@@ -449,6 +479,7 @@ def compare_three_scenarios(
         "Supplier": "Original Delayed Supplier",
         "Expected_Arrival_Date": loss_orig["Predicted_Arrival_Date"] or "N/A",
         "Production_Downtime_Days": loss_orig["Production_Downtime_Days"],
+        "Production_Downtime_Hours": loss_orig["Production_Downtime_Hours"],
         "Lost_Production_Units": loss_orig["Lost_Production_Units"],
         "Estimated_Production_Loss_INR": loss_orig["Total_Production_Loss"],
         "Additional_Procurement_Cost_INR": 0.0,
@@ -459,12 +490,14 @@ def compare_three_scenarios(
     # Scenario B: Second Alternative / Benchmark
     alt_b = runner_up_alternative_row if runner_up_alternative_row is not None else best_alternative_row
     if alt_b is not None and not alt_b.empty:
+        down_b = alt_b["Alt_Downtime_Days"]
         scenarios.append({
             "Scenario": f"Scenario B: Alternative Supplier ({alt_b['Supplier ID']})",
             "Supplier": alt_b["Supplier ID"],
             "Expected_Arrival_Date": alt_b["Alt_Delivery_Date"],
-            "Production_Downtime_Days": alt_b["Alt_Downtime_Days"],
-            "Lost_Production_Units": round(alt_b["Alt_Downtime_Days"] * daily_production, 2),
+            "Production_Downtime_Days": down_b,
+            "Production_Downtime_Hours": round(down_b * 24.0, 1),
+            "Lost_Production_Units": round(down_b * daily_production, 2),
             "Estimated_Production_Loss_INR": alt_b["Alt_Production_Loss"],
             "Additional_Procurement_Cost_INR": alt_b["Extra_Cost_INR"],
             "Production_Loss_Avoided_INR": alt_b["Loss_Avoided_INR"],
@@ -473,12 +506,14 @@ def compare_three_scenarios(
 
     # Scenario C: Best Feasible Alternative
     if best_alternative_row is not None and not best_alternative_row.empty:
+        down_c = best_alternative_row["Alt_Downtime_Days"]
         scenarios.append({
             "Scenario": f"Scenario C: Best Feasible Alternative ({best_alternative_row['Supplier ID']})",
             "Supplier": best_alternative_row["Supplier ID"],
             "Expected_Arrival_Date": best_alternative_row["Alt_Delivery_Date"],
-            "Production_Downtime_Days": best_alternative_row["Alt_Downtime_Days"],
-            "Lost_Production_Units": round(best_alternative_row["Alt_Downtime_Days"] * daily_production, 2),
+            "Production_Downtime_Days": down_c,
+            "Production_Downtime_Hours": round(down_c * 24.0, 1),
+            "Lost_Production_Units": round(down_c * daily_production, 2),
             "Estimated_Production_Loss_INR": best_alternative_row["Alt_Production_Loss"],
             "Additional_Procurement_Cost_INR": best_alternative_row["Extra_Cost_INR"],
             "Production_Loss_Avoided_INR": best_alternative_row["Loss_Avoided_INR"],
