@@ -6,34 +6,37 @@ from datetime import timedelta
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 MODEL_DIR = os.path.join(BASE_DIR, "models")
-DATA_DIR = os.path.join(BASE_DIR, "data")
 
 DELAY_PIPELINE_PATH = os.path.join(MODEL_DIR, "combined_delivery_delay_pipeline.pkl")
 RISK_PIPELINE_PATH = os.path.join(MODEL_DIR, "combined_delivery_risk_pipeline.pkl")
 ALTERNATIVE_ENGINE_PATH = os.path.join(MODEL_DIR, "alternative_supplier_engine.pkl")
 
-# Backwards compatibility aliases
-REGRESSION_MODEL_PATH = DELAY_PIPELINE_PATH
-CLASSIFICATION_MODEL_PATH = RISK_PIPELINE_PATH
+_DELAY_PIPE = None
+_RISK_PIPE = None
+_ALT_ENGINE = None
 
 
 def load_models():
-    """Load trained delivery delay and risk classification pipelines."""
-    if not os.path.exists(DELAY_PIPELINE_PATH):
-        raise FileNotFoundError(f"Delay pipeline not found: {DELAY_PIPELINE_PATH}")
-    if not os.path.exists(RISK_PIPELINE_PATH):
-        raise FileNotFoundError(f"Risk pipeline not found: {RISK_PIPELINE_PATH}")
-
-    delay_pipe = joblib.load(DELAY_PIPELINE_PATH)
-    risk_pipe = joblib.load(RISK_PIPELINE_PATH)
-    return delay_pipe, risk_pipe
+    """Load and cache trained delivery delay and risk classification pipelines."""
+    global _DELAY_PIPE, _RISK_PIPE
+    if _DELAY_PIPE is None or _RISK_PIPE is None:
+        if not os.path.exists(DELAY_PIPELINE_PATH):
+            raise FileNotFoundError(f"Delay pipeline not found: {DELAY_PIPELINE_PATH}")
+        if not os.path.exists(RISK_PIPELINE_PATH):
+            raise FileNotFoundError(f"Risk pipeline not found: {RISK_PIPELINE_PATH}")
+        _DELAY_PIPE = joblib.load(DELAY_PIPELINE_PATH)
+        _RISK_PIPE = joblib.load(RISK_PIPELINE_PATH)
+    return _DELAY_PIPE, _RISK_PIPE
 
 
 def load_alternative_engine():
-    """Load the alternative supplier recommendation engine and database."""
-    if not os.path.exists(ALTERNATIVE_ENGINE_PATH):
-        raise FileNotFoundError(f"Alternative supplier engine not found: {ALTERNATIVE_ENGINE_PATH}")
-    return joblib.load(ALTERNATIVE_ENGINE_PATH)
+    """Load and cache the alternative supplier recommendation engine and database."""
+    global _ALT_ENGINE
+    if _ALT_ENGINE is None:
+        if not os.path.exists(ALTERNATIVE_ENGINE_PATH):
+            raise FileNotFoundError(f"Alternative supplier engine not found: {ALTERNATIVE_ENGINE_PATH}")
+        _ALT_ENGINE = joblib.load(ALTERNATIVE_ENGINE_PATH)
+    return _ALT_ENGINE
 
 
 def build_manual_order(

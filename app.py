@@ -2,9 +2,7 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import plotly.express as px
-import plotly.graph_objects as go
 from pathlib import Path
-from datetime import timedelta
 
 import predict
 
@@ -19,12 +17,7 @@ st.set_page_config(
 )
 
 BASE_DIR = Path(__file__).resolve().parent
-MODEL_DIR = BASE_DIR / "models"
 DATA_DIR = BASE_DIR / "data"
-
-DELAY_PIPELINE_PATH = MODEL_DIR / "combined_delivery_delay_pipeline.pkl"
-RISK_PIPELINE_PATH = MODEL_DIR / "combined_delivery_risk_pipeline.pkl"
-ALTERNATIVE_ENGINE_PATH = MODEL_DIR / "alternative_supplier_engine.pkl"
 HISTORY_PATH = DATA_DIR / "processed" / "combined_supplier_delivery_data.csv"
 
 
@@ -48,8 +41,8 @@ def load_history():
 
 
 try:
-    delay_pipeline, risk_pipeline = load_cached_pipelines()
-    alt_engine = load_cached_alt_engine()
+    load_cached_pipelines()
+    load_cached_alt_engine()
     history = load_history()
 except Exception as e:
     st.error(f"Error loading system artifacts: {e}")
@@ -259,8 +252,6 @@ elif page == "Manual Purchase Order":
                     order_date=order_date,
                     promised_date=promised_date
                 )
-
-                original_lead_time = (promised_date - order_date).days
 
                 st.divider()
 
@@ -603,21 +594,22 @@ elif page == "Bulk CSV Prediction":
                         preds["Daily_Production_Requirement"] = pd.to_numeric(preds["Daily_Production_Requirement"], errors="coerce").fillna(1)
                         preds["Unit_Cost"] = pd.to_numeric(preds["Unit_Cost"], errors="coerce").fillna(0)
 
-                        for idx, row in preds.iterrows():
-                            ord_d = row["Order_Date"] if "Order_Date" in preds.columns else None
-                            prm_d = row["Promised_Date"] if "Promised_Date" in preds.columns else None
-                            l_info = predict.calculate_production_loss(
-                                predicted_delay_days=row["Predicted_Delay_Days"],
-                                available_stock=row["Available_Stock"],
-                                daily_production=row["Daily_Production_Requirement"],
-                                unit_cost=row["Unit_Cost"],
-                                order_date=ord_d,
-                                promised_date=prm_d
+                        loss_records = [
+                            predict.calculate_production_loss(
+                                predicted_delay_days=row.Predicted_Delay_Days,
+                                available_stock=row.Available_Stock,
+                                daily_production=row.Daily_Production_Requirement,
+                                unit_cost=row.Unit_Cost,
+                                order_date=getattr(row, "Order_Date", None),
+                                promised_date=getattr(row, "Promised_Date", None)
                             )
-                            preds.loc[idx, "Stock_Coverage_Days"] = l_info["Stock_Coverage_Days"]
-                            preds.loc[idx, "Production_Downtime_Days"] = l_info["Production_Downtime_Days"]
-                            preds.loc[idx, "Total_Production_Loss"] = l_info["Total_Production_Loss"]
-                            preds.loc[idx, "Stockout_Risk"] = l_info["Stockout_Risk"]
+                            for row in preds.itertuples(index=False)
+                        ]
+                        loss_df = pd.DataFrame(loss_records)
+                        preds["Stock_Coverage_Days"] = loss_df["Stock_Coverage_Days"].values
+                        preds["Production_Downtime_Days"] = loss_df["Production_Downtime_Days"].values
+                        preds["Total_Production_Loss"] = loss_df["Total_Production_Loss"].values
+                        preds["Stockout_Risk"] = loss_df["Stockout_Risk"].values
 
                         st.success("Batch processing completed successfully!")
 
