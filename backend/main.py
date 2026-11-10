@@ -236,7 +236,11 @@ async def audit_bulk_orders(file: UploadFile = File(...)):
         high_risk_orders = int((preds["Delivery_Risk"] == "High").sum())
         avg_delay = float(preds["Predicted_Delay_Days"].mean())
         
-        # Build output rows with Alternative Supplier recommendations for High Risk / Delayed orders
+        total_downtime_hrs = 0.0
+        total_financial_loss = 0.0
+        stockout_count = 0
+        
+        # Build output rows with Alternative Supplier recommendations and full loss analysis
         rows_output = []
         for idx, row in preds.iterrows():
             is_delayed = float(row.get("Predicted_Delay_Days", 0.0)) > 0.5
@@ -250,11 +254,37 @@ async def audit_bulk_orders(file: UploadFile = File(...)):
             delay_prob = round(float(row.get("Delay_Probability", 0.0)), 1)
             risk_tier = str(row.get("Delivery_Risk", "Low"))
             
+            unit_cost = float(row.get("Unit_Cost", 2500))
+            ord_date = str(row.get("Order_Date", "2026-11-25"))
+            prom_date = str(row.get("Promised_Date", "2026-11-28"))
+            stock = float(row.get("Available_Stock", qty * 0.4))
+            burn = float(row.get("Daily_Production", max(1.0, qty / 5.0)))
+            overhead = float(row.get("Daily_Fixed_Overhead", 50000.0))
+            
+            # Full production downtime and financial loss analysis
+            loss_info = predict.calculate_production_loss(
+                predicted_delay_days=delay_days,
+                available_stock=stock,
+                daily_production=burn,
+                unit_cost=unit_cost,
+                order_date=ord_date,
+                promised_date=prom_date,
+                daily_fixed_overhead=overhead
+            )
+            
+            if loss_info["Stockout_Risk"]:
+                stockout_count += 1
+            total_downtime_hrs += loss_info["Production_Downtime_Hours"]
+            total_financial_loss += loss_info["Total_Production_Loss"]
+            
             row_res = {
                 "Purchase_Order_ID": po_id,
                 "Supplier_ID": supplier_id,
                 "Item_ID": item_id,
                 "Quantity_Ordered": qty,
+                "Order_Date": ord_date,
+                "Promised_Date": prom_date,
+                "Unit_Cost": unit_cost,
                 "Predicted_Delay_Days": delay_days,
                 "Delay_Probability": delay_prob,
                 "Delivery_Risk": risk_tier,
@@ -264,16 +294,11 @@ async def audit_bulk_orders(file: UploadFile = File(...)):
                 "Alternative_Feasibility": "Order On Track",
                 "Alternative_Unit_Cost": 0.0,
                 "Has_Alternative": False,
+                "loss_analysis": loss_info,
                 "alternatives": []
             }
             
             if is_high_risk:
-                unit_cost = float(row.get("Unit_Cost", 2500))
-                ord_date = str(row.get("Order_Date", "2026-11-10"))
-                prom_date = str(row.get("Promised_Date", "2026-11-20"))
-                stock = float(row.get("Available_Stock", qty * 0.4))
-                burn = float(row.get("Daily_Production", max(1.0, qty / 5.0)))
-                
                 try:
                     alt_df = predict.find_alternative_suppliers(
                         item_id=item_id,
@@ -284,7 +309,7 @@ async def audit_bulk_orders(file: UploadFile = File(...)):
                         predicted_delay_days=delay_days,
                         available_stock=stock,
                         daily_production=burn,
-                        top_n=3
+                        top_n=5
                     )
                     if not alt_df.empty:
                         top_alt = alt_df.iloc[0]
@@ -294,7 +319,7 @@ async def audit_bulk_orders(file: UploadFile = File(...)):
                         row_res["Alternative_Feasibility"] = "Prevents Shutdown" if top_alt.get("Arrives_Before_Stockout") else "Shortens Downtime"
                         row_res["Alternative_Unit_Cost"] = float(top_alt.get("Raw_Unit_Cost", 0.0))
                         row_res["Has_Alternative"] = True
-                        row_res["alternatives"] = alt_df.head(3).to_dict(orient="records")
+                        row_res["alternatives"] = alt_df.head(5).to_dict(orient="records")
                     else:
                         row_res["Best_Alternative_Supplier"] = "No Alternate Registered"
                         row_res["Alternative_Feasibility"] = "No Approved Vendor"
@@ -310,7 +335,10 @@ async def audit_bulk_orders(file: UploadFile = File(...)):
                 "delayed_count": delayed_orders,
                 "delayed_pct": round((delayed_orders / max(total_orders, 1)) * 100, 1),
                 "high_risk_count": high_risk_orders,
-                "average_delay_days": round(avg_delay, 2)
+                "stockout_risk_count": stockout_count,
+                "average_delay_days": round(avg_delay, 2),
+                "total_downtime_hours": round(total_downtime_hrs, 1),
+                "total_financial_loss": round(total_financial_loss, 2)
             },
             "rows": rows_output[:100]
         }

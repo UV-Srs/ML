@@ -53,6 +53,7 @@ export default function App() {
   const [bulkLoading, setBulkLoading] = useState(false);
   const [bulkResult, setBulkResult] = useState(null);
   const [bulkError, setBulkError] = useState(null);
+  const [selectedBulkRow, setSelectedBulkRow] = useState(null);
 
   useEffect(() => {
     fetch('/api/meta')
@@ -133,6 +134,10 @@ export default function App() {
         throw new Error(data.detail || 'Bulk processing failed');
       }
       setBulkResult(data);
+      if (data.rows && data.rows.length > 0) {
+        const topRow = data.rows.find(r => r.Delivery_Risk === 'High' || (r.loss_analysis && r.loss_analysis.Stockout_Risk) || r.Has_Alternative) || data.rows[0];
+        setSelectedBulkRow(topRow);
+      }
     } catch (err) {
       setBulkError(err.message);
     } finally {
@@ -807,6 +812,22 @@ PO-2005,SUP-005,SUSP01,${todayStr},${defaultPromisedStr},450,4700,3100,560,Road,
 
               {bulkResult && (
                 <div>
+                  {/* BATCH HIGH RISK WARNING BANNER */}
+                  {(bulkResult.summary.high_risk_count > 0 || bulkResult.summary.delayed_count > 0) && (
+                    <div className="banner-alert banner-alert-danger" style={{ marginBottom: '20px' }}>
+                      <ShieldAlert size={22} style={{ flexShrink: 0 }} />
+                      <div>
+                        <div style={{ fontWeight: 700, fontSize: '15px', marginBottom: '4px' }}>
+                          Critical Supply Chain Disruption Warning: Buffer Exhaustion Detected Across Batch
+                        </div>
+                        <div>
+                          <strong>{bulkResult.summary.high_risk_count} High-Risk Orders</strong> identified ({bulkResult.summary.stockout_risk_count || 0} orders cause physical warehouse stockout). 
+                          Cumulative factory exposure: <strong>{bulkResult.summary.total_downtime_hours || 0} hours</strong> of assembly shutdown and <strong>{formatCurrency(bulkResult.summary.total_financial_loss)}</strong> in total production loss across your facility. Click any order row below to inspect individual plant impact and alternative vendors.
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                   <div className="kpi-grid">
                     <div className="kpi-card">
                       <div className="kpi-title">Total Orders Audited</div>
@@ -825,27 +846,29 @@ PO-2005,SUP-005,SUSP01,${todayStr},${defaultPromisedStr},450,4700,3100,560,Road,
                     </div>
 
                     <div className="kpi-card">
-                      <div className="kpi-title">High-Risk Orders</div>
-                      <div className="kpi-value" style={{ color: 'var(--warning-badge)' }}>
-                        {bulkResult.summary.high_risk_count.toLocaleString()}
+                      <div className="kpi-title">Assembly Line Downtime</div>
+                      <div className="kpi-value" style={{ color: bulkResult.summary.total_downtime_hours > 0 ? 'var(--danger-badge)' : 'var(--text-primary)' }}>
+                        {bulkResult.summary.total_downtime_hours || 0} hrs
                       </div>
-                      <div className="kpi-subtitle">Priority supplier intervention</div>
+                      <div className="kpi-subtitle">
+                        {bulkResult.summary.stockout_risk_count || 0} parts causing stockout
+                      </div>
                     </div>
 
                     <div className="kpi-card">
-                      <div className="kpi-title">Average Delay</div>
-                      <div className="kpi-value">
-                        {bulkResult.summary.average_delay_days.toFixed(1)} Days
+                      <div className="kpi-title">Total Projected Line Loss</div>
+                      <div className="kpi-value" style={{ color: bulkResult.summary.total_financial_loss > 0 ? 'var(--danger-badge)' : 'var(--text-primary)' }}>
+                        {formatCurrency(bulkResult.summary.total_financial_loss)}
                       </div>
-                      <div className="kpi-subtitle">Mean delay across batch</div>
+                      <div className="kpi-subtitle">Cumulative facility financial exposure</div>
                     </div>
                   </div>
 
                   <div className="card">
                     <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <div>
-                        <div className="card-title">Audited Orders Breakdown</div>
-                        <div className="card-subtitle">Showing predicted delays, risk tiers, and recommended substitute suppliers for at-risk orders.</div>
+                        <div className="card-title">Audited Purchase Orders Breakdown</div>
+                        <div className="card-subtitle">Showing predicted delays, risk tiers, and recommended substitute suppliers for at-risk orders. Click any row to inspect deep disruption diagnostics.</div>
                       </div>
                       <button type="button" onClick={exportAuditedCsv} className="btn-secondary" style={{ padding: '6px 12px', fontSize: '13px' }}>
                         <Download size={14} />
@@ -862,53 +885,314 @@ PO-2005,SUP-005,SUSP01,${todayStr},${defaultPromisedStr},450,4700,3100,560,Road,
                               <th>Part Item</th>
                               <th>Quantity</th>
                               <th>Predicted Delay</th>
-                              <th>Delay Probability</th>
                               <th>Risk Tier</th>
                               <th>Alternative Supplier Recommendation</th>
+                              <th>Action</th>
                             </tr>
                           </thead>
                           <tbody>
-                            {bulkResult.rows.map((row, idx) => (
-                              <tr key={idx}>
-                                <td style={{ fontWeight: 600 }}>{row.Purchase_Order_ID || `PO-${idx + 1}`}</td>
-                                <td>{row.Supplier_ID}</td>
-                                <td>{row.Item_ID}</td>
-                                <td>{Number(row.Quantity_Ordered).toLocaleString()}</td>
-                                <td>
-                                  <span style={{ fontWeight: 600, color: row.Predicted_Delay_Days > 0.5 ? 'var(--danger-badge)' : 'var(--success-badge)' }}>
-                                    {row.Predicted_Delay_Days > 0 ? `+${Number(row.Predicted_Delay_Days).toFixed(1)} d` : '0.0 d'}
-                                  </span>
-                                </td>
-                                <td>{Number(row.Delay_Probability).toFixed(1)}%</td>
-                                <td>
-                                  <span className={`badge ${row.Delivery_Risk === 'High' ? 'badge-danger' : (row.Delivery_Risk === 'Medium' ? 'badge-warning' : 'badge-success')}`}>
-                                    {row.Delivery_Risk} Risk
-                                  </span>
-                                </td>
-                                <td>
-                                  {row.Has_Alternative ? (
-                                    <div>
-                                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                        <strong style={{ color: 'var(--text-primary)' }}>{row.Best_Alternative_Supplier}</strong>
-                                        <span className="badge badge-blue" style={{ fontSize: '10px', padding: '1px 5px' }}>{row.Alternative_Match_Score}</span>
-                                      </div>
-                                      <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
-                                        Lead: {row.Alternative_Lead_Time} • <span style={{ color: row.Alternative_Feasibility === 'Prevents Shutdown' ? 'var(--success-text)' : 'var(--warning-text)', fontWeight: 600 }}>{row.Alternative_Feasibility}</span>
-                                      </div>
-                                    </div>
-                                  ) : (
-                                    <span style={{ color: 'var(--text-muted)', fontSize: '12px' }}>
-                                      {row.Predicted_Delay_Days > 0.5 ? 'No Alt Registered' : 'On Track (None Needed)'}
+                            {bulkResult.rows.map((row, idx) => {
+                              const isSelected = selectedBulkRow?.Purchase_Order_ID === row.Purchase_Order_ID;
+                              return (
+                                <tr 
+                                  key={idx} 
+                                  onClick={() => setSelectedBulkRow(row)} 
+                                  style={{ cursor: 'pointer', backgroundColor: isSelected ? '#eff6ff' : 'transparent', transition: 'background-color 0.15s ease' }}
+                                >
+                                  <td style={{ fontWeight: 600 }}>{row.Purchase_Order_ID || `PO-${idx + 1}`}</td>
+                                  <td>{row.Supplier_ID}</td>
+                                  <td>{row.Item_ID}</td>
+                                  <td>{Number(row.Quantity_Ordered).toLocaleString()}</td>
+                                  <td>
+                                    <span style={{ fontWeight: 600, color: row.Predicted_Delay_Days > 0.5 ? 'var(--danger-badge)' : 'var(--success-badge)' }}>
+                                      {row.Predicted_Delay_Days > 0 ? `+${Number(row.Predicted_Delay_Days).toFixed(1)} d` : '0.0 d'}
                                     </span>
-                                  )}
-                                </td>
-                              </tr>
-                            ))}
+                                  </td>
+                                  <td>
+                                    <span className={`badge ${row.Delivery_Risk === 'High' ? 'badge-danger' : (row.Delivery_Risk === 'Medium' ? 'badge-warning' : 'badge-success')}`}>
+                                      {row.Delivery_Risk} Risk
+                                    </span>
+                                  </td>
+                                  <td>
+                                    {row.Has_Alternative ? (
+                                      <div>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                          <strong style={{ color: 'var(--text-primary)' }}>{row.Best_Alternative_Supplier}</strong>
+                                          <span className="badge badge-blue" style={{ fontSize: '10px', padding: '1px 5px' }}>{row.Alternative_Match_Score}</span>
+                                        </div>
+                                        <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
+                                          Lead: {row.Alternative_Lead_Time} • <span style={{ color: row.Alternative_Feasibility === 'Prevents Shutdown' ? 'var(--success-text)' : 'var(--warning-text)', fontWeight: 600 }}>{row.Alternative_Feasibility}</span>
+                                        </div>
+                                      </div>
+                                    ) : (
+                                      <span style={{ color: 'var(--text-muted)', fontSize: '12px' }}>
+                                        {row.Predicted_Delay_Days > 0.5 ? 'No Alt Registered' : 'On Track (None Needed)'}
+                                      </span>
+                                    )}
+                                  </td>
+                                  <td>
+                                    <button 
+                                      type="button" 
+                                      className="btn-secondary" 
+                                      style={{ padding: '3px 8px', fontSize: '11px', whiteSpace: 'nowrap', backgroundColor: isSelected ? 'var(--blue-primary)' : '', color: isSelected ? '#ffffff' : '' }}
+                                      onClick={(e) => { e.stopPropagation(); setSelectedBulkRow(row); }}
+                                    >
+                                      {isSelected ? 'Viewing' : 'Inspect'}
+                                    </button>
+                                  </td>
+                                </tr>
+                              );
+                            })}
                           </tbody>
                         </table>
                       </div>
                     </div>
                   </div>
+
+                  {/* DEEP ASSESSMENT DETAILS FOR SELECTED BATCH PO (IDENTICAL TO SINGLE PO ASSESSMENT) */}
+                  {selectedBulkRow && selectedBulkRow.loss_analysis && (
+                    <div style={{ marginTop: '28px', borderTop: '2px dashed var(--border-color)', paddingTop: '24px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                        <div>
+                          <div style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <AlertTriangle size={18} style={{ color: selectedBulkRow.loss_analysis.Stockout_Risk ? 'var(--danger-badge)' : 'var(--blue-primary)' }} />
+                            <span>Detailed Production Disruption Assessment:</span>
+                            <span style={{ color: 'var(--blue-primary)' }}>{selectedBulkRow.Purchase_Order_ID}</span>
+                            <span style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-muted)' }}>({selectedBulkRow.Item_ID} from {selectedBulkRow.Supplier_ID})</span>
+                          </div>
+                          <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px' }}>
+                            Physical warehouse inventory simulation and financial impact analysis for selected order.
+                          </div>
+                        </div>
+
+                        <span className={`badge ${selectedBulkRow.Delivery_Risk === 'High' ? 'badge-danger' : (selectedBulkRow.Delivery_Risk === 'Medium' ? 'badge-warning' : 'badge-success')}`} style={{ fontSize: '12px', padding: '4px 10px' }}>
+                          {selectedBulkRow.Delivery_Risk} Risk • {selectedBulkRow.Delay_Probability}% Prob
+                        </span>
+                      </div>
+
+                      {/* Specific PO Warning Alert */}
+                      {selectedBulkRow.loss_analysis.Stockout_Risk ? (
+                        <div className="banner-alert banner-alert-danger" style={{ marginBottom: '20px' }}>
+                          <ShieldAlert size={20} />
+                          <div>
+                            <strong>Supply Chain Disruption Detected:</strong> Warehouse buffer will be fully exhausted on <strong>{selectedBulkRow.loss_analysis.Stockout_Date}</strong>. 
+                            The shipment arrives <strong>{selectedBulkRow.loss_analysis.Production_Downtime_Days} days late</strong> after stockout, triggering <strong>{selectedBulkRow.loss_analysis.Production_Downtime_Hours} hours ({selectedBulkRow.loss_analysis.Lost_Shifts_8h} shifts)</strong> of line shutdown and <strong>{selectedBulkRow.loss_analysis.Buffer_Deficit_Units} units</strong> of unmet assembly demand.
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="banner-alert banner-alert-success" style={{ marginBottom: '20px' }}>
+                          <CheckCircle2 size={20} />
+                          <div>
+                            <strong>Production Protected:</strong> Current warehouse inventory ({selectedBulkRow.loss_analysis.Stock_Coverage_Days} days runway) safely covers production until delivery arrives on <strong>{selectedBulkRow.loss_analysis.Predicted_Arrival_Date}</strong>. No assembly shutdown or idle overhead is incurred.
+                          </div>
+                        </div>
+                      )}
+
+                      {/* 4 PO KPI Cards */}
+                      <div className="kpi-grid">
+                        <div className="kpi-card">
+                          <div className="kpi-card-top">
+                            <span className="kpi-title">Delivery Delay</span>
+                            <div className="kpi-icon-pill" style={{ backgroundColor: selectedBulkRow.Predicted_Delay_Days > 0.5 ? 'var(--danger-bg)' : 'var(--success-bg)', color: selectedBulkRow.Predicted_Delay_Days > 0.5 ? 'var(--danger-text)' : 'var(--success-text)' }}>
+                              <Clock size={16} />
+                            </div>
+                          </div>
+                          <div className="kpi-value" style={{ color: selectedBulkRow.Predicted_Delay_Days > 0.5 ? 'var(--danger-badge)' : 'var(--success-badge)' }}>
+                            {selectedBulkRow.Predicted_Delay_Days > 0 ? `+${Number(selectedBulkRow.Predicted_Delay_Days).toFixed(1)} Days` : '0.0 Days'}
+                          </div>
+                          <div className="kpi-subtitle">
+                            Expected Arrival: <strong>{selectedBulkRow.loss_analysis.Predicted_Arrival_Date || 'On Schedule'}</strong>
+                          </div>
+                        </div>
+
+                        <div className="kpi-card">
+                          <div className="kpi-card-top">
+                            <span className="kpi-title">Risk Status</span>
+                            <div className="kpi-icon-pill" style={{ backgroundColor: 'var(--blue-light)', color: 'var(--blue-primary)' }}>
+                              <ShieldCheck size={16} />
+                            </div>
+                          </div>
+                          <div style={{ marginTop: '4px', marginBottom: '8px' }}>
+                            <span className={`badge ${selectedBulkRow.Delivery_Risk === 'High' ? 'badge-danger' : (selectedBulkRow.Delivery_Risk === 'Medium' ? 'badge-warning' : 'badge-success')}`}>
+                              {selectedBulkRow.Delivery_Risk} Risk
+                            </span>
+                          </div>
+                          <div className="kpi-subtitle">
+                            Delay Probability: <strong>{Number(selectedBulkRow.Delay_Probability).toFixed(1)}%</strong>
+                          </div>
+                        </div>
+
+                        <div className="kpi-card">
+                          <div className="kpi-card-top">
+                            <span className="kpi-title">Buffer Status</span>
+                            <div className="kpi-icon-pill" style={{ backgroundColor: selectedBulkRow.loss_analysis.Stockout_Risk ? 'var(--danger-bg)' : 'var(--success-bg)', color: selectedBulkRow.loss_analysis.Stockout_Risk ? 'var(--danger-text)' : 'var(--success-text)' }}>
+                              <Activity size={16} />
+                            </div>
+                          </div>
+                          <div className="kpi-value" style={{ color: selectedBulkRow.loss_analysis.Stockout_Risk ? 'var(--danger-badge)' : 'var(--success-badge)' }}>
+                            {selectedBulkRow.loss_analysis.Stockout_Risk ? 'Stockout Risk' : 'Buffer Secure'}
+                          </div>
+                          <div className="kpi-subtitle">
+                            {selectedBulkRow.loss_analysis.Stockout_Risk 
+                              ? `Depletion on ${selectedBulkRow.loss_analysis.Stockout_Date}` 
+                              : `${selectedBulkRow.loss_analysis.Stock_Coverage_Days} days buffer runway`}
+                          </div>
+                        </div>
+
+                        <div className="kpi-card">
+                          <div className="kpi-card-top">
+                            <span className="kpi-title">Projected Line Loss</span>
+                            <div className="kpi-icon-pill" style={{ backgroundColor: 'var(--blue-light)', color: 'var(--blue-primary)' }}>
+                              <DollarSign size={16} />
+                            </div>
+                          </div>
+                          <div className="kpi-value" style={{ color: selectedBulkRow.loss_analysis.Total_Production_Loss > 0 ? 'var(--danger-badge)' : 'var(--text-primary)' }}>
+                            {formatCurrency(selectedBulkRow.loss_analysis.Total_Production_Loss)}
+                          </div>
+                          <div className="kpi-subtitle">
+                            {selectedBulkRow.loss_analysis.Production_Downtime_Hours > 0 
+                              ? `${selectedBulkRow.loss_analysis.Production_Downtime_Hours} hrs assembly line idle` 
+                              : 'Zero production shutdown'}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Operational & Financial Tables for Selected PO */}
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '24px' }}>
+                        <div className="card" style={{ marginBottom: 0 }}>
+                          <div className="card-header">
+                            <div className="card-title">Production Line Impact ({selectedBulkRow.Purchase_Order_ID})</div>
+                          </div>
+                          <div className="card-body" style={{ padding: 0 }}>
+                            <table className="custom-table">
+                              <tbody>
+                                <tr>
+                                  <td style={{ color: 'var(--text-secondary)' }}>Available Buffer Coverage</td>
+                                  <td style={{ textAlign: 'right', fontWeight: 600 }}>{selectedBulkRow.loss_analysis.Stock_Coverage_Days} Days</td>
+                                </tr>
+                                <tr>
+                                  <td style={{ color: 'var(--text-secondary)' }}>Transit Timeline to Arrival</td>
+                                  <td style={{ textAlign: 'right', fontWeight: 600 }}>{selectedBulkRow.loss_analysis.Days_Until_Delivery} Days</td>
+                                </tr>
+                                <tr>
+                                  <td style={{ color: 'var(--text-secondary)' }}>Assembly Line Downtime</td>
+                                  <td style={{ textAlign: 'right', fontWeight: 700, color: selectedBulkRow.loss_analysis.Production_Downtime_Days > 0 ? 'var(--danger-badge)' : 'var(--text-primary)' }}>
+                                    {selectedBulkRow.loss_analysis.Production_Downtime_Days} Days ({selectedBulkRow.loss_analysis.Production_Downtime_Hours} hrs)
+                                  </td>
+                                </tr>
+                                <tr>
+                                  <td style={{ color: 'var(--text-secondary)' }}>Lost 8-Hour Operational Shifts</td>
+                                  <td style={{ textAlign: 'right', fontWeight: 600 }}>{selectedBulkRow.loss_analysis.Lost_Shifts_8h} Shifts</td>
+                                </tr>
+                                <tr>
+                                  <td style={{ color: 'var(--text-secondary)' }}>Unmet Component Demand</td>
+                                  <td style={{ textAlign: 'right', fontWeight: 600 }}>{selectedBulkRow.loss_analysis.Lost_Production_Units} Units</td>
+                                </tr>
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+
+                        <div className="card" style={{ marginBottom: 0 }}>
+                          <div className="card-header">
+                            <div className="card-title">Financial Exposure Breakdown ({selectedBulkRow.Purchase_Order_ID})</div>
+                          </div>
+                          <div className="card-body" style={{ padding: 0 }}>
+                            <table className="custom-table">
+                              <tbody>
+                                <tr>
+                                  <td style={{ color: 'var(--text-secondary)' }}>Daily Line Output Value</td>
+                                  <td style={{ textAlign: 'right', fontWeight: 600 }}>{formatCurrency(selectedBulkRow.loss_analysis.Daily_Production_Loss)} / day</td>
+                                </tr>
+                                <tr>
+                                  <td style={{ color: 'var(--text-secondary)' }}>Direct Component Shortfall Loss</td>
+                                  <td style={{ textAlign: 'right', fontWeight: 600 }}>{formatCurrency(selectedBulkRow.loss_analysis.Direct_Product_Loss)}</td>
+                                </tr>
+                                <tr>
+                                  <td style={{ color: 'var(--text-secondary)' }}>Fixed Idling Line Overhead</td>
+                                  <td style={{ textAlign: 'right', fontWeight: 600 }}>{formatCurrency(selectedBulkRow.loss_analysis.Fixed_Overhead_Loss)}</td>
+                                </tr>
+                                <tr style={{ backgroundColor: '#fcfcfd' }}>
+                                  <td style={{ fontWeight: 700, color: 'var(--text-primary)', paddingTop: '16px' }}>Total Projected Financial Loss</td>
+                                  <td style={{ textAlign: 'right', fontWeight: 700, fontSize: '15px', color: selectedBulkRow.loss_analysis.Total_Production_Loss > 0 ? 'var(--danger-badge)' : 'var(--success-badge)', paddingTop: '16px' }}>
+                                    {formatCurrency(selectedBulkRow.loss_analysis.Total_Production_Loss)}
+                                  </td>
+                                </tr>
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Verified Alternative Supplier Recommendations for Selected PO */}
+                      <div className="card">
+                        <div className="card-header">
+                          <div>
+                            <div className="card-title">Verified Alternative Supplier Recommendations for {selectedBulkRow.Purchase_Order_ID}</div>
+                            <div className="card-subtitle">Substitute suppliers ranked by Multi-Criteria Decision Analysis (MCDA) for part {selectedBulkRow.Item_ID}.</div>
+                          </div>
+                        </div>
+
+                        <div className="card-body" style={{ padding: 0 }}>
+                          {selectedBulkRow.alternatives && selectedBulkRow.alternatives.length > 0 ? (
+                            <div className="table-container">
+                              <table className="custom-table">
+                                <thead>
+                                  <tr>
+                                    <th>Rank</th>
+                                    <th>Candidate Vendor</th>
+                                    <th>MCDA Score</th>
+                                    <th>Lead Time</th>
+                                    <th>Available Stock</th>
+                                    <th>Unit Price</th>
+                                    <th>Downtime Prevented</th>
+                                    <th>Net Cost Savings</th>
+                                    <th>Operational Feasibility</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {selectedBulkRow.alternatives.map((alt, idx) => (
+                                    <tr key={alt.Raw_Supplier_ID || idx}>
+                                      <td style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>#{idx + 1}</td>
+                                      <td>
+                                        <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{alt['Supplier ID']}</div>
+                                        <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Rating: {alt['Supplier Rating']}</div>
+                                      </td>
+                                      <td>
+                                        <span className="badge badge-blue" style={{ fontWeight: 700 }}>
+                                          {alt['Match Score']}
+                                        </span>
+                                      </td>
+                                      <td>{alt['Lead Time']}</td>
+                                      <td>{alt['Available Quantity']} Units</td>
+                                      <td>₹ {Number(alt.Raw_Unit_Cost).toLocaleString('en-IN')}</td>
+                                      <td>
+                                        <span style={{ fontWeight: 600, color: alt.Downtime_Prevented_Days > 0 ? 'var(--success-badge)' : 'var(--text-muted)' }}>
+                                          {alt.Downtime_Prevented_Days > 0 ? `+${alt.Downtime_Prevented_Days} Days` : '0 d'}
+                                        </span>
+                                      </td>
+                                      <td style={{ fontWeight: 700, color: alt.Net_Benefit_INR > 0 ? 'var(--success-text)' : 'var(--text-secondary)' }}>
+                                        {formatCurrency(alt.Net_Benefit_INR)}
+                                      </td>
+                                      <td>
+                                        <span className={`badge ${alt.Arrives_Before_Stockout ? 'badge-success' : (alt.Downtime_Prevented_Days > 0 ? 'badge-warning' : 'badge-danger')}`}>
+                                          {alt.Arrives_Before_Stockout ? 'Prevents Shutdown' : (alt.Downtime_Prevented_Days > 0 ? 'Shortens Downtime' : 'No Lead Benefit')}
+                                        </span>
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          ) : (
+                            <div style={{ padding: '32px', textAlign: 'center', color: 'var(--text-muted)' }}>
+                              No alternative suppliers needed: delivery creates no stockout threat, or no secondary vendor is registered for part code <strong>{selectedBulkRow.Item_ID}</strong>.
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
