@@ -805,6 +805,157 @@ body {
   max-width: 800px;
 }
 
+/* Model Performance Extended Tabs & Components */
+.model-tabs-bar {
+  display: flex;
+  gap: 8px;
+  border-bottom: 1px solid var(--border-light);
+  margin-bottom: 22px;
+  padding-bottom: 0px;
+}
+
+.model-tab-btn {
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  padding: 10px 16px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.model-tab-btn:hover {
+  color: var(--blue-primary);
+}
+
+.model-tab-btn.active {
+  color: var(--blue-primary);
+  border-bottom-color: var(--blue-primary);
+  font-weight: 600;
+}
+
+.spec-chips-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+
+.spec-chip {
+  background-color: var(--bg-subtle);
+  border: 1px solid var(--border-light);
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.spec-chip strong {
+  color: var(--text-primary);
+}
+
+.delta-pill-pos {
+  background-color: var(--success-bg);
+  border: 1px solid var(--success-border);
+  color: var(--success-text);
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 10px;
+}
+
+.delta-pill-neg {
+  background-color: var(--blue-light);
+  border: 1px solid var(--blue-border);
+  color: var(--blue-text);
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 10px;
+}
+
+/* Feature Importance Horizontal Bars */
+.feat-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.feat-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.feat-name {
+  width: 220px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex-shrink: 0;
+}
+
+.feat-track {
+  flex: 1;
+  height: 8px;
+  background-color: var(--bg-subtle);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.feat-fill {
+  height: 100%;
+  background-color: var(--blue-primary);
+  border-radius: 4px;
+  transition: width 0.3s ease;
+}
+
+.feat-pct {
+  width: 48px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+  text-align: right;
+  flex-shrink: 0;
+}
+
+/* Decision Threshold Simulator */
+.threshold-slider-box {
+  background-color: var(--bg-subtle);
+  border: 1px solid var(--border-light);
+  border-radius: 8px;
+  padding: 20px;
+  margin-bottom: 22px;
+}
+
+.slider-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.slider-input-range {
+  width: 100%;
+  height: 6px;
+  background: #cbd5e1;
+  border-radius: 3px;
+  outline: none;
+  cursor: pointer;
+  accent-color: var(--blue-primary);
+}
+
 @keyframes spin {
   to { transform: rotate(360deg); }
 }
