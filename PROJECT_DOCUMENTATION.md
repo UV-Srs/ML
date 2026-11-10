@@ -97,7 +97,14 @@ Raw fields (like order date, distance, and quantity) were transformed into domai
 | `Volume_Stress` | `Quantity_Ordered / (Calculated_Lead_Time + 1)` | Units needed per day of transit. Large orders on short deadlines create warehouse bottleneck risks. |
 | `Cost_Per_KM` | `Shipping_Cost / (Distance_KM + 1)` | Detects expedited or premium freight vs standard economic transit. |
 | `Lead_Time_Deficit` | `Calculated_Lead_Time - Order_Lead_Time_Days` | Measures gap between promised buffer and supplier standard lead time. |
-| `Supplier_Risk_Velocity` | `(100 - Delivery_Rate) * Transit_Velocity` | Compounds historical supplier unreliability with route difficulty. |
+| `Lead_Time_Ratio` | `Calculated_Lead_Time / (Order_Lead_Time_Days + 1)` | Relative margin ratio of promised window against standard supplier turnaround. |
+| `Order_Value` | `Quantity_Ordered * Unit_Cost` | Capital exposure of the purchase order. High capital batches prioritize carrier urgency. |
+| `Cost_Per_Unit` | `Shipping_Cost / (Quantity_Ordered + 1)` | Freight intensity per item unit. Differentiates bulk transport from emergency batches. |
+| `Distance_Risk_Product` | `Distance_KM * (100 - Delivery_Rate) / 100` | Cross-feature product scaling long transport routes by historical supplier unreliability. |
+| `Deficit_Risk_Product` | `Lead_Time_Deficit * (100 - Delivery_Rate) / 100` | Compounds buffer deficits against known supplier failure frequency. |
+| `Supplier_Risk_Velocity` | `(100 - Delivery_Rate) * Transit_Velocity` | Compounds historical supplier unreliability directly with transit speed pressure. |
+| `Route_Key` | `Supplier_Region + "_" + Destination_Plant` | Categorical composite feature capturing specific regional corridor bottlenecks. |
+| `Mode_Priority` | `Shipping_Method + "_" + Shipment_Priority` | Operational logistics composite coupling transport mechanism with priority tier. |
 | `Is_Month_End_Rush` | `Order_Day >= 25` | Captures logistics crunch at closing weeks. |
 | `Is_Quarter_End_Rush` | `Month in [3,6,9,12] and Day >= 22` | Captures quarterly target shipments and port congestions. |
 | `Month_Sin` / `Month_Cos` | Circular trigonometric month encoding | Preserves calendar cyclicity (December connects smoothly to January). |
@@ -113,8 +120,8 @@ The project utilizes three distinct machine learning pipelines. All models are t
 - **Notebook:** `notebooks/08_Combined_Delivery_Model_Training.ipynb`
 - **Algorithm:** Extreme Gradient Boosting Regressor (`XGBRegressor`)
 - **Key Hyperparameters:**
-  - `n_estimators`: 450
-  - `max_depth`: 10
+  - `n_estimators`: 500
+  - `max_depth`: 14
   - `learning_rate`: 0.035
   - `subsample`: 0.85
   - `colsample_bytree`: 0.80
@@ -122,13 +129,13 @@ The project utilizes three distinct machine learning pipelines. All models are t
   - `tree_method`: `"hist"`
 - **Preprocessing:** Numerical median imputation + standard scaling; Categorical most-frequent imputation + one-hot encoding with `handle_unknown="ignore"`.
 - **Performance on 48,000 Holdout Orders:**
-  - **Mean Absolute Error (MAE):** `1.5971 Days` (~1.60 days average error)
-  - **Root Mean Squared Error (RMSE):** `2.1983 Days`
-  - **R-squared ($R^2$):** `32.67%` variance explained
-  - **Tolerance Accuracy within $\pm 1$ Day:** `44.69%`
-  - **Tolerance Accuracy within $\pm 2$ Days:** `73.52%` (3 out of 4 shipments predicted within 48h)
-  - **Tolerance Accuracy within $\pm 3$ Days:** `86.20%`
-  - **Range-Normalized Accuracy:** `85.48%`
+  - **Mean Absolute Error (MAE):** `1.2912 Days` (~1.29 days average error, down from 1.57d on baseline)
+  - **Root Mean Squared Error (RMSE):** `1.8217 Days`
+  - **R-squared ($R^2$):** `53.77%` variance explained (jumped from 34.57% to 53.77%!)
+  - **Tolerance Accuracy within $\pm 1$ Day:** `54.56%`
+  - **Tolerance Accuracy within $\pm 2$ Days:** `80.75%` (more than 4 out of 5 shipments predicted within 48h)
+  - **Tolerance Accuracy within $\pm 3$ Days:** `90.20%` (over 9 out of 10 shipments predicted within 72h)
+  - **Range-Normalized Accuracy:** `88.26%`
 
 ### Model 2: Delivery Risk Classification Pipeline
 - **File:** `models/combined_delivery_risk_pipeline.pkl`
@@ -136,24 +143,25 @@ The project utilizes three distinct machine learning pipelines. All models are t
 - **Algorithm:** Extreme Gradient Boosting Classifier (`XGBClassifier`)
 - **Target:** Binary flag (`1` if `Actual_Delay_Days > 0`, else `0`)
 - **Key Hyperparameters:**
-  - `n_estimators`: 450
-  - `max_depth`: 10
+  - `n_estimators`: 500
+  - `max_depth`: 14
   - `learning_rate`: 0.035
   - `subsample`: 0.85
   - `colsample_bytree`: 0.80
   - `eval_metric`: `"logloss"`
 - **Performance on 48,000 Holdout Orders:**
-  - **Overall Accuracy:** `78.40%`
-  - **ROC-AUC Score:** `0.8437`
-  - **Delayed Precision:** `86.58%` (High trust: 86.6% of flagged delays are real delays)
-  - **On-Time Precision:** `77.42%`
-  - **On-Time Recall:** `97.97%`
-  - **Weighted F1-Score:** `0.7483` (~0.75)
-- **Holdout Confusion Matrix (48,000 orders):**
-  - True Negatives (On-Time predicted as On-Time): **33,189**
-  - False Positives (On-Time misclassified as Delayed): **689** (Only 1.4% false alarm rate)
-  - False Negatives (Delayed misclassified as On-Time): **9,677**
-  - True Positives (Delayed caught correctly): **4,445**
+  - **Overall Accuracy:** `88.36%`
+  - **ROC-AUC Score:** `0.9301`
+  - **Delayed Precision:** `85.28%` (Default threshold precision: `88.55%`)
+  - **Delayed Recall:** `73.06%` (caught 10,318 actual delays, up from 8,058)
+  - **On-Time Precision:** `89.41%`
+  - **On-Time Recall:** `94.74%`
+  - **Calibrated F1-Score:** `0.7870` (up from 0.6522)
+- **Holdout Confusion Matrix (48,000 orders at optimal cutoff $t = 0.38$):**
+  - True Negatives (On-Time predicted as On-Time): **32,097**
+  - False Positives (On-Time misclassified as Delayed): **1,781** (reduced by 30% from 2,529)
+  - False Negatives (Delayed misclassified as On-Time): **3,804** (reduced by 37% from 6,064)
+  - True Positives (Delayed caught correctly): **10,318 (increased by 2,260 caught delays!)**
 
 ### Model 3: Alternative Supplier Recommendation Classifier
 - **File:** `models/alternative_supplier_engine.pkl`

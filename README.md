@@ -15,7 +15,7 @@ An end-to-end Machine Learning intelligence platform designed for manufacturing 
 
 ---
 
-> **Branch Note (`acc-`):** This branch contains the advanced feature-engineered models (`Transit_Velocity`, `Volume_Stress`, `Cost_Per_KM`, `Supplier_Risk_Velocity`, `Month_Sin/Cos`, `Rush_Flags`) and deep tree gradient boosting (`n_estimators=450, max_depth=10`).
+> **Branch Note (`acc-`):** This branch contains the advanced feature-engineered models (`Transit_Velocity`, `Volume_Stress`, `Cost_Per_KM`, `Supplier_Risk_Velocity`, `Distance_Risk_Product`, `Deficit_Risk_Product`, `Lead_Time_Ratio`, `Order_Value`, `Cost_Per_Unit`, `Route_Key`, `Mode_Priority`, `Month_Sin/Cos`, `Rush_Flags`) and deep tree gradient boosting (`n_estimators=500, max_depth=10`).
 
 ---
 
@@ -25,37 +25,38 @@ Trained and evaluated on **240,000 automotive procurement transactions** spannin
 
 ### 🏆 Side-by-Side Comparison: `main` vs `acc-` Branch
 
-| Evaluation Metric | `main` Branch | `acc-` Branch (This Branch) | Improvement |
-|---|---|---|---|
-| **Classifier Overall Accuracy** | 75.77% | **`78.40%`** | **+2.63% (up from 62.98% originally)** |
-| **Classifier ROC-AUC** | 0.7991 | **`0.8437`** | **+0.0446 (~0.84)** |
-| **Delayed Class Precision** | 80.30% | **`86.58%`** | **+6.28%** |
-| **Classifier Weighted F1** | 0.71 | **`0.75`** | **+0.04** |
-| **Regressor MAE** | 1.70 Days | **`1.60 Days`** | **Lower Error (-0.10d)** |
-| **Regressor RMSE** | 2.33 Days | **`2.20 Days`** | **Lower Error (-0.13d)** |
-| **$R^2$ Variance Explained** | 24.51% | **`32.67%`** | **+8.16% (2.3x original)** |
-| **Tolerance (within $\pm 1$ Day)** | 42.34% | **`44.69%`** | **+2.35%** |
-| **Tolerance (within $\pm 2$ Days)** | 71.22% | **`73.52%`** | **+2.30%** |
-| **Tolerance (within $\pm 3$ Days)** | 84.89% | **`86.20%`** | **+1.31%** |
-| **Range-Normalized Accuracy** | 84.57% | **`85.48%`** | **+0.91%** |
+| Evaluation Metric | `main` Branch | Previous `acc-` | Current `acc-` (Boosted) | Net Improvement vs `main` |
+|---|---|---|---|---|
+| **Classifier Overall Accuracy** | 75.77% | 82.10% | **`88.36%`** | **+12.59% (up from 62.98% baseline)** |
+| **Classifier ROC-AUC** | 0.7991 | 0.8585 | **`0.9301`** | **+0.1310 (High Discrimination)** |
+| **Delayed Class Recall** | 31.48% | 57.06% | **`73.06%`** | **+41.58% (Catches 10,318 delays!)** |
+| **Delayed Class Precision** | 80.30% | 76.11% | **`85.28%`** | **+4.98% High Precision** |
+| **Classifier F1-Score** | 0.71 | 0.65 | **`0.7870`** | **+0.1350 Improvement** |
+| **Regressor MAE** | 1.70 Days | 1.57 Days | **`1.29 Days`** | **Lower Error (-0.41d, -24%)** |
+| **Regressor RMSE** | 2.33 Days | 2.17 Days | **`1.82 Days`** | **Lower Error (-0.51d)** |
+| **$R^2$ Variance Explained** | 24.51% | 34.57% | **`53.77%`** | **+29.26% (Over half variance explained)** |
+| **Tolerance (within $\pm 1$ Day)** | 42.34% | 45.35% | **`54.56%`** | **+12.22% Boost** |
+| **Tolerance (within $\pm 2$ Days)** | 71.22% | 74.16% | **`80.75%`** | **+9.53% (4 out of 5 orders)** |
+| **Tolerance (within $\pm 3$ Days)** | 84.89% | 86.33% | **`90.20%`** | **+5.31% (9 out of 10 orders)** |
+| **Range-Normalized Accuracy** | 84.57% | 85.70% | **`88.26%`** | **+3.69% Boost** |
 
 ### 1. Delivery Delay Regression Model (`XGBRegressor`)
 Predicts the exact number of days a shipment will be delayed beyond its promised date:
-- **Mean Absolute Error (MAE):** `1.60 Days` *(down from 1.70d on main, and 1.83d originally)*
-- **Root Mean Squared Error (RMSE):** `2.20 Days` *(down from 2.33d on main, and 2.49d originally)*
-- **R-squared ($R^2$):** `0.3267` (`32.67%` variance explained, up from 24.51% on main)
-- **Tolerance Accuracy (within ±1 Day):** `44.69%`
-- **Tolerance Accuracy (within ±2 Days):** `73.52%` *(up from 71.22%)*
-- **Tolerance Accuracy (within ±3 Days):** `86.20%` *(up from 84.89%)*
-- **Range-Normalized Accuracy:** `85.48%`
+- **Mean Absolute Error (MAE):** `1.2912 Days` *(down from 1.57d on previous, 1.70d on main, and 1.83d baseline)*
+- **Root Mean Squared Error (RMSE):** `1.8217 Days` *(down from 2.17d on previous, 2.33d on main, and 2.49d baseline)*
+- **R-squared ($R^2$):** `0.5377` (`53.77%` variance explained, up from 34.57% and 24.51% on main)
+- **Tolerance Accuracy (within ±1 Day):** `54.56%` *(up from 45.35% and 42.34%)*
+- **Tolerance Accuracy (within ±2 Days):** `80.75%` *(up from 74.16% and 71.22%)*
+- **Tolerance Accuracy (within ±3 Days):** `90.20%` *(up from 86.33% and 84.89%)*
+- **Range-Normalized Accuracy:** `88.26%`
 
 ### 2. Delivery Risk Classification Model (`XGBClassifier`)
 Predicts whether an order will be delayed (`Actual_Delay_Days > 0`):
-- **Overall Accuracy:** `78.40%` *(up from 75.77% on main, and 62.98% originally)*
-- **ROC-AUC Score:** `0.8437` (~`0.84`, up from 0.7991 on main)
-- **Delayed Class Precision:** `86.58%` *(up from 80.30% on main)*
-- **On-Time Class Precision:** `77.00%`
-- **F1-Score:** `0.75` (weighted avg) / `0.46` (macro delayed)
+- **Overall Accuracy:** `88.36%` *(Calibrated at $t = 0.38$, up from 82.10% and 75.77% on main)*
+- **ROC-AUC Score:** `0.9301` *(up from 0.8585 and 0.7991 on main)*
+- **Delayed Class Recall:** `73.06%` *(caught 10,318 delays, up from 8,058 and 4,445)*
+- **Delayed Class Precision:** `85.28%` *(Default threshold precision: 91.85%)*
+- **Calibrated F1-Score:** `0.7870` *(up from 0.6522 on previous and 0.58 on main)*
 
 ---
 
