@@ -1,22 +1,26 @@
 import React, { useState, useEffect } from 'react';
 import { 
+  Truck, 
+  FileText, 
+  UploadCloud, 
+  BarChart3, 
+  ShieldCheck, 
+  ShieldAlert, 
   AlertTriangle, 
-  CheckCircle2, 
   Clock, 
   DollarSign, 
-  FileText, 
-  Layers, 
-  Upload, 
   Download, 
-  ShieldAlert, 
-  ShieldCheck,
-  ChevronRight,
-  TrendingDown,
-  Building2
+  ChevronRight, 
+  Building2, 
+  CheckCircle2, 
+  Info,
+  Calendar,
+  Layers,
+  Activity
 } from 'lucide-react';
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState('single');
+  const [activeNav, setActiveNav] = useState('single');
   const [meta, setMeta] = useState({
     suppliers: [],
     items: [],
@@ -24,7 +28,6 @@ export default function App() {
     total_records: 0
   });
 
-  // Calculate default dates
   const todayStr = new Date().toISOString().split('T')[0];
   const defaultPromised = new Date();
   defaultPromised.setDate(defaultPromised.getDate() + 10);
@@ -54,7 +57,6 @@ export default function App() {
   const [bulkResult, setBulkResult] = useState(null);
   const [bulkError, setBulkError] = useState(null);
 
-  // Fetch metadata on mount
   useEffect(() => {
     fetch('/api/meta')
       .then(res => {
@@ -72,7 +74,7 @@ export default function App() {
         }
       })
       .catch(err => {
-        console.warn('Metadata fetch warning:', err.message);
+        console.warn('Metadata load note:', err.message);
       });
   }, []);
 
@@ -154,647 +156,811 @@ PO-2005,SUP-005,ENG01,${todayStr},${defaultPromisedStr},450,4700,3100,560,54.2,1
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.setAttribute('href', url);
-    link.setAttribute('download', 'sample_po_audit_template.csv');
+    link.setAttribute('download', 'purchase_orders_template.csv');
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
   };
 
-  // Helper formatting functions
   const formatCurrency = (val) => {
     if (val === undefined || val === null) return '₹ 0';
     return `₹ ${Number(val).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`;
   };
 
-  const formatNumber = (val, dec = 1) => {
-    if (val === undefined || val === null) return '0';
-    return Number(val).toLocaleString('en-IN', { minimumFractionDigits: dec, maximumFractionDigits: dec });
-  };
-
   return (
-    <div className="app-container">
-      {/* Header */}
-      <header className="app-header">
-        <div className="brand-section">
-          <div className="brand-badge">
-            <Layers size={20} />
+    <div className="dashboard-layout">
+      {/* LEFT SIDEBAR */}
+      <aside className="sidebar">
+        <div className="sidebar-header">
+          <div className="sidebar-brand-icon">
+            <Truck size={20} />
           </div>
           <div>
-            <h1 className="brand-title">Supply Chain Risk & Delivery Intelligence</h1>
-            <p className="brand-subtitle">Proactive delay modeling, plant downtime prevention & alternative supplier allocation</p>
+            <div className="sidebar-brand-title">SupplyChain Monitor</div>
+            <div className="sidebar-brand-subtitle">Delivery & Downtime Risk</div>
           </div>
         </div>
 
-        <div className="header-status">
-          <span className="status-dot"></span>
-          <span>XGBoost v14 Active (Depth-14)</span>
-        </div>
-      </header>
+        <nav className="sidebar-nav">
+          <div className="nav-section-title">Operations</div>
+          <button 
+            type="button"
+            className={`nav-item ${activeNav === 'single' ? 'active' : ''}`}
+            onClick={() => setActiveNav('single')}
+          >
+            <FileText size={16} className="nav-icon" />
+            <span>Single PO Assessment</span>
+          </button>
 
-      {/* Navigation Segmented Tab */}
-      <div className="view-nav">
-        <button 
-          className={`nav-tab ${activeTab === 'single' ? 'active' : ''}`}
-          onClick={() => setActiveTab('single')}
-        >
-          <FileText size={15} />
-          Single Purchase Order
-        </button>
-        <button 
-          className={`nav-tab ${activeTab === 'bulk' ? 'active' : ''}`}
-          onClick={() => setActiveTab('bulk')}
-        >
-          <Upload size={15} />
-          Batch CSV Audit
-        </button>
-      </div>
+          <button 
+            type="button"
+            className={`nav-item ${activeNav === 'bulk' ? 'active' : ''}`}
+            onClick={() => setActiveNav('bulk')}
+          >
+            <UploadCloud size={16} className="nav-icon" />
+            <span>Batch CSV Audit</span>
+          </button>
 
-      {/* TAB 1: SINGLE PURCHASE ORDER ASSESSMENT */}
-      {activeTab === 'single' && (
-        <div>
-          <div className="panel">
-            <div className="panel-header">
-              <span className="panel-title">
-                <Clock size={16} />
-                Order Parameters & Factory Operating Conditions
-              </span>
-              <span className="form-label-hint">All calculations run in real-time</span>
-            </div>
+          <div className="nav-section-title" style={{ marginTop: '16px' }}>Diagnostics</div>
+          <button 
+            type="button"
+            className={`nav-item ${activeNav === 'models' ? 'active' : ''}`}
+            onClick={() => setActiveNav('models')}
+          >
+            <BarChart3 size={16} className="nav-icon" />
+            <span>Model Performance</span>
+          </button>
+        </nav>
 
-            <form onSubmit={handleSingleSubmit}>
-              <div className="form-grid">
-                {/* Column 1: Order Details */}
-                <div className="form-fieldset">
-                  <div className="fieldset-title">Purchase Order Details</div>
-                  
-                  <div className="form-group">
-                    <label className="form-label">
-                      Purchase Order ID
-                      <span className="form-label-hint">PO Reference</span>
-                    </label>
-                    <input 
-                      type="text" 
-                      name="purchase_order_id" 
-                      value={form.purchase_order_id} 
-                      onChange={handleInputChange} 
-                      className="form-input" 
-                      required 
-                    />
-                  </div>
-
-                  <div className="form-group">
-                    <label className="form-label">
-                      Primary Supplier
-                      <span className="form-label-hint">Contracted Vendor</span>
-                    </label>
-                    <select 
-                      name="supplier_id" 
-                      value={form.supplier_id} 
-                      onChange={handleInputChange} 
-                      className="form-select"
-                    >
-                      {meta.suppliers && meta.suppliers.length > 0 ? (
-                        meta.suppliers.map(s => (
-                          <option key={s} value={s}>{s}</option>
-                        ))
-                      ) : (
-                        ['SUP-001', 'SUP-002', 'SUP-003', 'SUP-004', 'SUP-005', 'SUP-006', 'SUP-007', 'SUP-008'].map(s => (
-                          <option key={s} value={s}>{s}</option>
-                        ))
-                      )}
-                    </select>
-                  </div>
-
-                  <div className="form-group">
-                    <label className="form-label">
-                      Part / Component ID
-                      <span className="form-label-hint">Manufacturing Item</span>
-                    </label>
-                    <select 
-                      name="item_id" 
-                      value={form.item_id} 
-                      onChange={handleInputChange} 
-                      className="form-select"
-                    >
-                      {meta.items && meta.items.length > 0 ? (
-                        meta.items.map(item => (
-                          <option key={item.id} value={item.id}>{item.label || `${item.id} - ${item.name}`}</option>
-                        ))
-                      ) : (
-                        [
-                          { id: 'ENG01', name: 'Engine Block' },
-                          { id: 'BRK02', name: 'Brake Caliper' },
-                          { id: 'TRN03', name: 'Transmission Unit' },
-                          { id: 'ELE04', name: 'Wiring Harness' },
-                          { id: 'SUS05', name: 'Suspension Strut' }
-                        ].map(item => (
-                          <option key={item.id} value={item.id}>{item.id} - {item.name}</option>
-                        ))
-                      )}
-                    </select>
-                  </div>
-
-                  <div className="form-group">
-                    <label className="form-label">
-                      Order Quantity
-                      <span className="form-label-hint">Units</span>
-                    </label>
-                    <input 
-                      type="number" 
-                      name="quantity" 
-                      value={form.quantity} 
-                      onChange={handleInputChange} 
-                      min="1" 
-                      className="form-input" 
-                      required 
-                    />
-                  </div>
-
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                    <div className="form-group">
-                      <label className="form-label">Order Date</label>
-                      <input 
-                        type="date" 
-                        name="order_date" 
-                        value={form.order_date} 
-                        onChange={handleInputChange} 
-                        className="form-input" 
-                        required 
-                      />
-                    </div>
-                    <div className="form-group">
-                      <label className="form-label">Promised Date</label>
-                      <input 
-                        type="date" 
-                        name="promised_date" 
-                        value={form.promised_date} 
-                        onChange={handleInputChange} 
-                        className="form-input" 
-                        required 
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Column 2: Inventory & Line Context */}
-                <div className="form-fieldset">
-                  <div className="fieldset-title">Plant Inventory & Financial Context</div>
-
-                  <div className="form-group">
-                    <label className="form-label">
-                      Available Buffer Stock
-                      <span className="form-label-hint">Units in Warehouse</span>
-                    </label>
-                    <input 
-                      type="number" 
-                      name="available_stock" 
-                      value={form.available_stock} 
-                      onChange={handleInputChange} 
-                      min="0" 
-                      className="form-input" 
-                      required 
-                    />
-                  </div>
-
-                  <div className="form-group">
-                    <label className="form-label">
-                      Daily Factory Burn Rate
-                      <span className="form-label-hint">Units Consumed / Day</span>
-                    </label>
-                    <input 
-                      type="number" 
-                      name="daily_production" 
-                      value={form.daily_production} 
-                      onChange={handleInputChange} 
-                      min="1" 
-                      className="form-input" 
-                      required 
-                    />
-                  </div>
-
-                  <div className="form-group">
-                    <label className="form-label">
-                      Component Unit Cost
-                      <span className="form-label-hint">₹ / Unit</span>
-                    </label>
-                    <input 
-                      type="number" 
-                      name="unit_cost" 
-                      value={form.unit_cost} 
-                      onChange={handleInputChange} 
-                      min="1" 
-                      className="form-input" 
-                      required 
-                    />
-                  </div>
-
-                  <div className="form-group">
-                    <label className="form-label">
-                      Daily Plant Fixed Overhead
-                      <span className="form-label-hint">₹ / Idle Day Loss</span>
-                    </label>
-                    <input 
-                      type="number" 
-                      name="daily_fixed_overhead" 
-                      value={form.daily_fixed_overhead} 
-                      onChange={handleInputChange} 
-                      min="0" 
-                      className="form-input" 
-                      required 
-                    />
-                  </div>
-
-                  <div style={{ marginTop: '14px', padding: '12px 14px', backgroundColor: 'var(--bg-input)', borderRadius: '5px', border: '1px solid var(--border-subtle)' }}>
-                    <div style={{ fontSize: '11px', color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Baseline Buffer Runway</div>
-                    <div style={{ fontSize: '14px', fontFamily: 'var(--font-mono)', fontWeight: '600', color: 'var(--text-main)', marginTop: '2px' }}>
-                      {form.daily_production > 0 ? (form.available_stock / form.daily_production).toFixed(1) : 0} Days of Production Covered
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Action Button */}
-              <div className="form-actions">
-                <div className="form-stats-hint">
-                  Continuous multi-variable inference via combined XGBoost regressor & classifier
-                </div>
-                <button type="submit" className="btn-primary" disabled={loading}>
-                  {loading && <span className="spinner"></span>}
-                  {loading ? 'Evaluating Risk...' : 'Run Risk Assessment'}
-                  {!loading && <ChevronRight size={16} />}
-                </button>
-              </div>
-            </form>
-          </div>
-
-          {error && (
-            <div className="alert-box alert-danger">
-              <AlertTriangle size={18} />
-              <div><strong>Error:</strong> {error}</div>
-            </div>
-          )}
-
-          {/* RESULTS PRESENTATION */}
-          {result && (
+        <div className="sidebar-footer">
+          <div className="system-status-box">
+            <span className="status-dot-pulse"></span>
             <div>
-              {/* Primary Metric Strip */}
-              <div className="metrics-row">
-                {/* 1. Delay Prediction */}
-                <div className="metric-card">
-                  <div className="metric-label">Predicted Delivery Delay</div>
-                  <div className={`metric-value ${result.prediction.predicted_delay_days > 0.5 ? 'text-danger' : 'text-success'}`}>
-                    {result.prediction.predicted_delay_days > 0 
-                      ? `+${result.prediction.predicted_delay_days.toFixed(1)} d` 
-                      : '0.0 d'}
-                  </div>
-                  <div className="metric-sub">
-                    Expected Arrival: <strong style={{ color: 'var(--text-main)' }}>{result.loss_analysis.Predicted_Arrival_Date || 'N/A'}</strong>
+              <div className="status-text-title">XGBoost v14 Online</div>
+              <div className="status-text-sub">93.0% ROC-AUC • Calibrated</div>
+            </div>
+          </div>
+        </div>
+      </aside>
+
+      {/* MAIN CONTENT AREA */}
+      <div className="main-wrapper">
+        {/* Top Header */}
+        <header className="top-header">
+          <div className="header-breadcrumbs">
+            <span>Plant Operations</span>
+            <span>/</span>
+            <span className="header-title-bold">
+              {activeNav === 'single' && 'Purchase Order Delivery Risk Assessment'}
+              {activeNav === 'bulk' && 'Batch Purchase Order Risk Audit'}
+              {activeNav === 'models' && 'Machine Learning Model Benchmarks & Metrics'}
+            </span>
+          </div>
+
+          <div className="header-right-meta">
+            <div className="facility-badge">
+              <Building2 size={14} />
+              <span>Assembly Line 01 • Dynamic Buffer</span>
+            </div>
+          </div>
+        </header>
+
+        {/* Content Body */}
+        <main className="content-body">
+          {/* TAB 1: SINGLE PURCHASE ORDER */}
+          {activeNav === 'single' && (
+            <div>
+              {/* Form Card */}
+              <div className="card">
+                <div className="card-header">
+                  <div className="card-header-left">
+                    <div className="card-icon-container">
+                      <Clock size={18} />
+                    </div>
+                    <div>
+                      <div className="card-title">Order Details & Plant Buffer Conditions</div>
+                      <div className="card-subtitle">Enter purchase order parameters to forecast delivery delay, stock exhaustion, and line downtime.</div>
+                    </div>
                   </div>
                 </div>
 
-                {/* 2. Delay Risk Tier */}
-                <div className="metric-card">
-                  <div className="metric-label">Delivery Risk Status</div>
-                  <div style={{ marginTop: '4px', marginBottom: '8px' }}>
-                    {result.prediction.risk_tier === 'High' && (
-                      <span className="badge badge-high"><AlertTriangle size={12} /> High Delay Risk</span>
-                    )}
-                    {result.prediction.risk_tier === 'Medium' && (
-                      <span className="badge badge-medium"><Clock size={12} /> Medium Delay Risk</span>
-                    )}
-                    {result.prediction.risk_tier === 'Low' && (
-                      <span className="badge badge-low"><ShieldCheck size={12} /> On Schedule</span>
-                    )}
-                  </div>
-                  <div className="metric-sub">
-                    Delay Probability: <strong style={{ color: 'var(--text-main)' }}>{result.prediction.delay_probability.toFixed(1)}%</strong>
-                  </div>
-                </div>
+                <div className="card-body">
+                  <form onSubmit={handleSingleSubmit}>
+                    <div className="form-columns">
+                      {/* Left: PO Details */}
+                      <div>
+                        <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '14px', borderBottom: '1px solid var(--border-light)', paddingBottom: '6px' }}>
+                          1. Purchase Order Specifications
+                        </div>
 
-                {/* 3. Stockout & Downtime Status */}
-                <div className="metric-card">
-                  <div className="metric-label">Plant Inventory Buffer</div>
-                  <div className={`metric-value ${result.loss_analysis.Stockout_Risk ? 'text-danger' : 'text-success'}`}>
-                    {result.loss_analysis.Stockout_Risk ? 'Stockout Risk' : 'Buffer Secure'}
-                  </div>
-                  <div className="metric-sub">
-                    {result.loss_analysis.Stockout_Risk 
-                      ? `Exhaustion on ${result.loss_analysis.Stockout_Date}` 
-                      : `${result.loss_analysis.Stock_Coverage_Days} days of buffer stock`}
-                  </div>
-                </div>
+                        <div className="form-group">
+                          <label className="form-label">
+                            <span>PO Identifier</span>
+                            <span className="form-hint">Internal Reference</span>
+                          </label>
+                          <input 
+                            type="text" 
+                            name="purchase_order_id" 
+                            value={form.purchase_order_id} 
+                            onChange={handleInputChange} 
+                            className="form-input" 
+                            required 
+                          />
+                        </div>
 
-                {/* 4. Financial Impact */}
-                <div className="metric-card">
-                  <div className="metric-label">Total Projected Financial Loss</div>
-                  <div className={`metric-value ${result.loss_analysis.Total_Production_Loss > 0 ? 'text-danger' : 'text-main'}`}>
-                    {formatCurrency(result.loss_analysis.Total_Production_Loss)}
-                  </div>
-                  <div className="metric-sub">
-                    {result.loss_analysis.Production_Downtime_Hours > 0 
-                      ? `${result.loss_analysis.Production_Downtime_Hours}h production line downtime` 
-                      : 'Zero factory downtime projected'}
-                  </div>
+                        <div className="form-group">
+                          <label className="form-label">
+                            <span>Primary Supplier</span>
+                            <span className="form-hint">Contracted Vendor</span>
+                          </label>
+                          <select 
+                            name="supplier_id" 
+                            value={form.supplier_id} 
+                            onChange={handleInputChange} 
+                            className="form-select"
+                          >
+                            {meta.suppliers && meta.suppliers.length > 0 ? (
+                              meta.suppliers.map(s => (
+                                <option key={s} value={s}>{s}</option>
+                              ))
+                            ) : (
+                              ['SUP-001', 'SUP-002', 'SUP-003', 'SUP-004', 'SUP-005', 'SUP-006'].map(s => (
+                                <option key={s} value={s}>{s}</option>
+                              ))
+                            )}
+                          </select>
+                        </div>
+
+                        <div className="form-group">
+                          <label className="form-label">
+                            <span>Component Part ID</span>
+                            <span className="form-hint">Item Catalog</span>
+                          </label>
+                          <select 
+                            name="item_id" 
+                            value={form.item_id} 
+                            onChange={handleInputChange} 
+                            className="form-select"
+                          >
+                            {meta.items && meta.items.length > 0 ? (
+                              meta.items.map(item => (
+                                <option key={item.id} value={item.id}>{item.label || `${item.id} - ${item.name}`}</option>
+                              ))
+                            ) : (
+                              [
+                                { id: 'ENG01', name: 'Engine Block' },
+                                { id: 'BRK02', name: 'Brake Caliper' },
+                                { id: 'TRN03', name: 'Transmission Unit' },
+                                { id: 'ELE04', name: 'Wiring Harness' }
+                              ].map(item => (
+                                <option key={item.id} value={item.id}>{item.id} - {item.name}</option>
+                              ))
+                            )}
+                          </select>
+                        </div>
+
+                        <div className="form-group">
+                          <label className="form-label">
+                            <span>Order Quantity</span>
+                            <span className="form-hint">Units</span>
+                          </label>
+                          <input 
+                            type="number" 
+                            name="quantity" 
+                            value={form.quantity} 
+                            onChange={handleInputChange} 
+                            min="1" 
+                            className="form-input" 
+                            required 
+                          />
+                        </div>
+
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                          <div className="form-group">
+                            <label className="form-label">Order Date</label>
+                            <input 
+                              type="date" 
+                              name="order_date" 
+                              value={form.order_date} 
+                              onChange={handleInputChange} 
+                              className="form-input" 
+                              required 
+                            />
+                          </div>
+                          <div className="form-group">
+                            <label className="form-label">Promised Date</label>
+                            <input 
+                              type="date" 
+                              name="promised_date" 
+                              value={form.promised_date} 
+                              onChange={handleInputChange} 
+                              className="form-input" 
+                              required 
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Right: Plant Conditions */}
+                      <div>
+                        <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '14px', borderBottom: '1px solid var(--border-light)', paddingBottom: '6px' }}>
+                          2. Factory Inventory & Financial Baseline
+                        </div>
+
+                        <div className="form-group">
+                          <label className="form-label">
+                            <span>Available Buffer Stock</span>
+                            <span className="form-hint">Warehouse Units on Hand</span>
+                          </label>
+                          <input 
+                            type="number" 
+                            name="available_stock" 
+                            value={form.available_stock} 
+                            onChange={handleInputChange} 
+                            min="0" 
+                            className="form-input" 
+                            required 
+                          />
+                        </div>
+
+                        <div className="form-group">
+                          <label className="form-label">
+                            <span>Daily Production Burn Rate</span>
+                            <span className="form-hint">Units Consumed / Day</span>
+                          </label>
+                          <input 
+                            type="number" 
+                            name="daily_production" 
+                            value={form.daily_production} 
+                            onChange={handleInputChange} 
+                            min="1" 
+                            className="form-input" 
+                            required 
+                          />
+                        </div>
+
+                        <div className="form-group">
+                          <label className="form-label">
+                            <span>Component Unit Cost</span>
+                            <span className="form-hint">₹ / Unit</span>
+                          </label>
+                          <input 
+                            type="number" 
+                            name="unit_cost" 
+                            value={form.unit_cost} 
+                            onChange={handleInputChange} 
+                            min="1" 
+                            className="form-input" 
+                            required 
+                          />
+                        </div>
+
+                        <div className="form-group">
+                          <label className="form-label">
+                            <span>Daily Idle Line Overhead</span>
+                            <span className="form-hint">₹ / Day Facility Loss</span>
+                          </label>
+                          <input 
+                            type="number" 
+                            name="daily_fixed_overhead" 
+                            value={form.daily_fixed_overhead} 
+                            onChange={handleInputChange} 
+                            min="0" 
+                            className="form-input" 
+                            required 
+                          />
+                        </div>
+
+                        <div style={{ backgroundColor: 'var(--bg-subtle)', border: '1px solid var(--border-light)', borderRadius: '6px', padding: '12px 14px', marginTop: '10px' }}>
+                          <div style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600 }}>Warehouse Stock Runway</div>
+                          <div style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text-primary)', marginTop: '2px' }}>
+                            {form.daily_production > 0 ? (form.available_stock / form.daily_production).toFixed(1) : 0} Days of Operations Covered
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Single Action Button */}
+                    <div className="form-footer">
+                      <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                        Inference executes delay regression, risk classification, and physical inventory stockout timeline simulation.
+                      </div>
+                      <button type="submit" className="btn-primary" disabled={loading}>
+                        {loading && <span className="loading-spinner"></span>}
+                        {loading ? 'Evaluating Risk...' : 'Run Risk Assessment'}
+                        {!loading && <ChevronRight size={16} />}
+                      </button>
+                    </div>
+                  </form>
                 </div>
               </div>
 
-              {/* Status Alert Banner */}
-              {result.loss_analysis.Stockout_Risk ? (
-                <div className="alert-box alert-danger">
-                  <ShieldAlert size={20} />
-                  <div>
-                    <strong>Critical Supply Chain Alert:</strong> Inventory exhaustion is projected on <strong>{result.loss_analysis.Stockout_Date}</strong>. 
-                    Delivery will arrive <strong>{result.loss_analysis.Production_Downtime_Days} days late</strong> after stock is depleted, causing an estimated <strong>{result.loss_analysis.Production_Downtime_Hours} hours ({result.loss_analysis.Lost_Shifts_8h} shifts)</strong> of plant shutdown and <strong>{result.loss_analysis.Buffer_Deficit_Units} units</strong> of unmet production.
-                  </div>
-                </div>
-              ) : (
-                <div className="alert-box alert-safe">
-                  <CheckCircle2 size={20} />
-                  <div>
-                    <strong>Operations Protected:</strong> Existing buffer stock ({result.loss_analysis.Stock_Coverage_Days} days) is sufficient to bridge the transit timeline until delivery arrival on <strong>{result.loss_analysis.Predicted_Arrival_Date}</strong>. No production disruption or downtime is projected.
-                  </div>
+              {error && (
+                <div className="banner-alert banner-alert-danger">
+                  <AlertTriangle size={18} />
+                  <div><strong>Error:</strong> {error}</div>
                 </div>
               )}
 
-              {/* Operational & Financial Breakdown */}
-              <div className="detail-grid">
-                <div className="panel" style={{ marginBottom: 0 }}>
-                  <div className="panel-header">
-                    <span className="panel-title">Production Line Downtime Impact</span>
-                  </div>
-                  <table className="data-table-compact">
-                    <tbody>
-                      <tr>
-                        <td>Available Buffer Coverage</td>
-                        <td>{result.loss_analysis.Stock_Coverage_Days} Days</td>
-                      </tr>
-                      <tr>
-                        <td>Transit Timeline to Arrival</td>
-                        <td>{result.loss_analysis.Days_Until_Delivery} Days</td>
-                      </tr>
-                      <tr>
-                        <td>Uncovered Line Downtime</td>
-                        <td className={result.loss_analysis.Production_Downtime_Days > 0 ? 'text-danger' : ''}>
-                          {result.loss_analysis.Production_Downtime_Days} Days ({result.loss_analysis.Production_Downtime_Hours} hrs)
-                        </td>
-                      </tr>
-                      <tr>
-                        <td>Lost Operational Shifts (8h)</td>
-                        <td>{result.loss_analysis.Lost_Shifts_8h} Shifts</td>
-                      </tr>
-                      <tr>
-                        <td>Unmet Assembly Output</td>
-                        <td>{result.loss_analysis.Lost_Production_Units} Units</td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
+              {/* RESULTS PRESENTATION */}
+              {result && (
+                <div>
+                  {/* KPI Bar */}
+                  <div className="kpi-grid">
+                    <div className="kpi-card">
+                      <div className="kpi-card-top">
+                        <span className="kpi-title">Delivery Delay</span>
+                        <div className="kpi-icon-pill" style={{ backgroundColor: result.prediction.predicted_delay_days > 0.5 ? 'var(--danger-bg)' : 'var(--success-bg)', color: result.prediction.predicted_delay_days > 0.5 ? 'var(--danger-text)' : 'var(--success-text)' }}>
+                          <Clock size={16} />
+                        </div>
+                      </div>
+                      <div className="kpi-value" style={{ color: result.prediction.predicted_delay_days > 0.5 ? 'var(--danger-badge)' : 'var(--success-badge)' }}>
+                        {result.prediction.predicted_delay_days > 0 ? `+${result.prediction.predicted_delay_days.toFixed(1)} Days` : '0.0 Days'}
+                      </div>
+                      <div className="kpi-subtitle">
+                        Expected Arrival: <strong>{result.loss_analysis.Predicted_Arrival_Date || 'On Schedule'}</strong>
+                      </div>
+                    </div>
 
-                <div className="panel" style={{ marginBottom: 0 }}>
-                  <div className="panel-header">
-                    <span className="panel-title">Financial Exposure Breakdown</span>
-                  </div>
-                  <table className="data-table-compact">
-                    <tbody>
-                      <tr>
-                        <td>Daily Production Value</td>
-                        <td>{formatCurrency(result.loss_analysis.Daily_Production_Loss)} / day</td>
-                      </tr>
-                      <tr>
-                        <td>Direct Material Shortfall Loss</td>
-                        <td>{formatCurrency(result.loss_analysis.Direct_Product_Loss)}</td>
-                      </tr>
-                      <tr>
-                        <td>Fixed Overhead Incurred During Idle</td>
-                        <td>{formatCurrency(result.loss_analysis.Fixed_Overhead_Loss)}</td>
-                      </tr>
-                      <tr style={{ borderBottom: 'none' }}>
-                        <td style={{ fontWeight: 600, color: 'var(--text-main)', paddingTop: '14px' }}>Total Projected Line Loss</td>
-                        <td style={{ fontWeight: 700, fontSize: '15px', color: result.loss_analysis.Total_Production_Loss > 0 ? 'var(--danger)' : 'var(--success)', paddingTop: '14px' }}>
-                          {formatCurrency(result.loss_analysis.Total_Production_Loss)}
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-              </div>
+                    <div className="kpi-card">
+                      <div className="kpi-card-top">
+                        <span className="kpi-title">Risk Status</span>
+                        <div className="kpi-icon-pill" style={{ backgroundColor: 'var(--blue-light)', color: 'var(--blue-primary)' }}>
+                          <ShieldCheck size={16} />
+                        </div>
+                      </div>
+                      <div style={{ marginTop: '4px', marginBottom: '8px' }}>
+                        {result.prediction.risk_tier === 'High' && (
+                          <span className="badge badge-danger">High Delay Risk</span>
+                        )}
+                        {result.prediction.risk_tier === 'Medium' && (
+                          <span className="badge badge-warning">Medium Delay Risk</span>
+                        )}
+                        {result.prediction.risk_tier === 'Low' && (
+                          <span className="badge badge-success">On Schedule</span>
+                        )}
+                      </div>
+                      <div className="kpi-subtitle">
+                        Delay Probability: <strong>{result.prediction.delay_probability.toFixed(1)}%</strong>
+                      </div>
+                    </div>
 
-              {/* Alternative Suppliers Table */}
-              <div className="panel" style={{ marginTop: '24px' }}>
-                <div className="panel-header">
-                  <div>
-                    <span className="panel-title">
-                      <Building2 size={16} />
-                      Verified Alternative Supplier Recommendations (MCDA Scored)
-                    </span>
-                    <p style={{ fontSize: '12px', color: 'var(--text-dim)', marginTop: '4px' }}>
-                      Ranked by multi-criteria decision analysis incorporating lead time velocity, stockout prevention, on-time history, and net financial benefit.
-                    </p>
+                    <div className="kpi-card">
+                      <div className="kpi-card-top">
+                        <span className="kpi-title">Buffer Status</span>
+                        <div className="kpi-icon-pill" style={{ backgroundColor: result.loss_analysis.Stockout_Risk ? 'var(--danger-bg)' : 'var(--success-bg)', color: result.loss_analysis.Stockout_Risk ? 'var(--danger-text)' : 'var(--success-text)' }}>
+                          <Activity size={16} />
+                        </div>
+                      </div>
+                      <div className="kpi-value" style={{ color: result.loss_analysis.Stockout_Risk ? 'var(--danger-badge)' : 'var(--success-badge)' }}>
+                        {result.loss_analysis.Stockout_Risk ? 'Stockout Risk' : 'Buffer Secure'}
+                      </div>
+                      <div className="kpi-subtitle">
+                        {result.loss_analysis.Stockout_Risk 
+                          ? `Depletion on ${result.loss_analysis.Stockout_Date}` 
+                          : `${result.loss_analysis.Stock_Coverage_Days} days of buffer protection`}
+                      </div>
+                    </div>
+
+                    <div className="kpi-card">
+                      <div className="kpi-card-top">
+                        <span className="kpi-title">Projected Line Loss</span>
+                        <div className="kpi-icon-pill" style={{ backgroundColor: 'var(--blue-light)', color: 'var(--blue-primary)' }}>
+                          <DollarSign size={16} />
+                        </div>
+                      </div>
+                      <div className="kpi-value" style={{ color: result.loss_analysis.Total_Production_Loss > 0 ? 'var(--danger-badge)' : 'var(--text-primary)' }}>
+                        {formatCurrency(result.loss_analysis.Total_Production_Loss)}
+                      </div>
+                      <div className="kpi-subtitle">
+                        {result.loss_analysis.Production_Downtime_Hours > 0 
+                          ? `${result.loss_analysis.Production_Downtime_Hours} hrs assembly line idle` 
+                          : 'Zero production shutdown'}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Impact Alert */}
+                  {result.loss_analysis.Stockout_Risk ? (
+                    <div className="banner-alert banner-alert-danger">
+                      <ShieldAlert size={20} />
+                      <div>
+                        <strong>Supply Chain Disruption Detected:</strong> Warehouse buffer will be fully exhausted on <strong>{result.loss_analysis.Stockout_Date}</strong>. 
+                        The shipment arrives <strong>{result.loss_analysis.Production_Downtime_Days} days late</strong> after stockout, triggering <strong>{result.loss_analysis.Production_Downtime_Hours} hours ({result.loss_analysis.Lost_Shifts_8h} shifts)</strong> of line shutdown and <strong>{result.loss_analysis.Buffer_Deficit_Units} units</strong> of unmet assembly.
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="banner-alert banner-alert-success">
+                      <CheckCircle2 size={20} />
+                      <div>
+                        <strong>Production Protected:</strong> Current warehouse inventory ({result.loss_analysis.Stock_Coverage_Days} days runway) safely covers production until delivery arrives on <strong>{result.loss_analysis.Predicted_Arrival_Date}</strong>. No assembly shutdown or idle overhead is incurred.
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Operational & Financial Details */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '24px' }}>
+                    <div className="card" style={{ marginBottom: 0 }}>
+                      <div className="card-header">
+                        <div className="card-title">Production Line Impact</div>
+                      </div>
+                      <div className="card-body" style={{ padding: 0 }}>
+                        <table className="custom-table">
+                          <tbody>
+                            <tr>
+                              <td style={{ color: 'var(--text-secondary)' }}>Available Buffer Coverage</td>
+                              <td style={{ textAlign: 'right', fontWeight: 600 }}>{result.loss_analysis.Stock_Coverage_Days} Days</td>
+                            </tr>
+                            <tr>
+                              <td style={{ color: 'var(--text-secondary)' }}>Transit Timeline to Arrival</td>
+                              <td style={{ textAlign: 'right', fontWeight: 600 }}>{result.loss_analysis.Days_Until_Delivery} Days</td>
+                            </tr>
+                            <tr>
+                              <td style={{ color: 'var(--text-secondary)' }}>Assembly Line Downtime</td>
+                              <td style={{ textAlign: 'right', fontWeight: 700, color: result.loss_analysis.Production_Downtime_Days > 0 ? 'var(--danger-badge)' : 'var(--text-primary)' }}>
+                                {result.loss_analysis.Production_Downtime_Days} Days ({result.loss_analysis.Production_Downtime_Hours} hrs)
+                              </td>
+                            </tr>
+                            <tr>
+                              <td style={{ color: 'var(--text-secondary)' }}>Lost 8-Hour Operational Shifts</td>
+                              <td style={{ textAlign: 'right', fontWeight: 600 }}>{result.loss_analysis.Lost_Shifts_8h} Shifts</td>
+                            </tr>
+                            <tr>
+                              <td style={{ color: 'var(--text-secondary)' }}>Unmet Component Demand</td>
+                              <td style={{ textAlign: 'right', fontWeight: 600 }}>{result.loss_analysis.Lost_Production_Units} Units</td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+
+                    <div className="card" style={{ marginBottom: 0 }}>
+                      <div className="card-header">
+                        <div className="card-title">Financial Exposure Breakdown</div>
+                      </div>
+                      <div className="card-body" style={{ padding: 0 }}>
+                        <table className="custom-table">
+                          <tbody>
+                            <tr>
+                              <td style={{ color: 'var(--text-secondary)' }}>Daily Line Output Value</td>
+                              <td style={{ textAlign: 'right', fontWeight: 600 }}>{formatCurrency(result.loss_analysis.Daily_Production_Loss)} / day</td>
+                            </tr>
+                            <tr>
+                              <td style={{ color: 'var(--text-secondary)' }}>Direct Component Shortfall Loss</td>
+                              <td style={{ textAlign: 'right', fontWeight: 600 }}>{formatCurrency(result.loss_analysis.Direct_Product_Loss)}</td>
+                            </tr>
+                            <tr>
+                              <td style={{ color: 'var(--text-secondary)' }}>Fixed Idling Line Overhead</td>
+                              <td style={{ textAlign: 'right', fontWeight: 600 }}>{formatCurrency(result.loss_analysis.Fixed_Overhead_Loss)}</td>
+                            </tr>
+                            <tr style={{ backgroundColor: '#fcfcfd' }}>
+                              <td style={{ fontWeight: 700, color: 'var(--text-primary)', paddingTop: '16px' }}>Total Projected Financial Loss</td>
+                              <td style={{ textAlign: 'right', fontWeight: 700, fontSize: '15px', color: result.loss_analysis.Total_Production_Loss > 0 ? 'var(--danger-badge)' : 'var(--success-badge)', paddingTop: '16px' }}>
+                                {formatCurrency(result.loss_analysis.Total_Production_Loss)}
+                              </td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Alternative Suppliers Table */}
+                  <div className="card">
+                    <div className="card-header">
+                      <div>
+                        <div className="card-title">Verified Alternative Supplier Recommendations</div>
+                        <div className="card-subtitle">Substitute suppliers ranked by Multi-Criteria Decision Analysis (MCDA) incorporating lead time, stockout prevention, on-time reliability, and net savings.</div>
+                      </div>
+                    </div>
+
+                    <div className="card-body" style={{ padding: 0 }}>
+                      {result.alternatives && result.alternatives.length > 0 ? (
+                        <div className="table-container">
+                          <table className="custom-table">
+                            <thead>
+                              <tr>
+                                <th>Rank</th>
+                                <th>Candidate Vendor</th>
+                                <th>MCDA Score</th>
+                                <th>Lead Time</th>
+                                <th>Available Stock</th>
+                                <th>Unit Price</th>
+                                <th>Downtime Prevented</th>
+                                <th>Net Cost Savings</th>
+                                <th>Operational Feasibility</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {result.alternatives.map((alt, idx) => (
+                                <tr key={alt.Raw_Supplier_ID || idx}>
+                                  <td style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>#{idx + 1}</td>
+                                  <td>
+                                    <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{alt['Supplier ID']}</div>
+                                    <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Rating: {alt['Supplier Rating']}</div>
+                                  </td>
+                                  <td>
+                                    <span className="badge badge-blue" style={{ fontWeight: 700 }}>
+                                      {alt['Match Score']}
+                                    </span>
+                                  </td>
+                                  <td>{alt['Lead Time']}</td>
+                                  <td>{alt['Available Quantity']} Units</td>
+                                  <td>₹ {Number(alt.Raw_Unit_Cost).toLocaleString('en-IN')}</td>
+                                  <td>
+                                    <span style={{ fontWeight: 600, color: alt.Downtime_Prevented_Days > 0 ? 'var(--success-badge)' : 'var(--text-muted)' }}>
+                                      {alt.Downtime_Prevented_Days > 0 ? `+${alt.Downtime_Prevented_Days} Days` : '0 d'}
+                                    </span>
+                                  </td>
+                                  <td style={{ fontWeight: 700, color: alt.Net_Benefit_INR > 0 ? 'var(--success-text)' : 'var(--text-secondary)' }}>
+                                    {formatCurrency(alt.Net_Benefit_INR)}
+                                  </td>
+                                  <td>
+                                    <span className={`badge ${alt.Arrives_Before_Stockout ? 'badge-success' : (alt.Downtime_Prevented_Days > 0 ? 'badge-warning' : 'badge-danger')}`}>
+                                      {alt.Arrives_Before_Stockout ? 'Prevents Shutdown' : (alt.Downtime_Prevented_Days > 0 ? 'Shortens Downtime' : 'No Lead Benefit')}
+                                    </span>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      ) : (
+                        <div style={{ padding: '32px', textAlign: 'center', color: 'var(--text-muted)' }}>
+                          No alternative suppliers needed: the order delivery creates no stockout threat, or no secondary vendor is registered for part code <strong>{form.item_id}</strong>.
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
-
-                {result.alternatives && result.alternatives.length > 0 ? (
-                  <div className="table-wrapper">
-                    <table className="data-table">
-                      <thead>
-                        <tr>
-                          <th>Rank</th>
-                          <th>Candidate Supplier</th>
-                          <th>MCDA Match</th>
-                          <th>Lead Time</th>
-                          <th>Available Qty</th>
-                          <th>Unit Cost</th>
-                          <th>Downtime Avoided</th>
-                          <th>Net Benefit</th>
-                          <th>Feasibility Assessment</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {result.alternatives.map((alt, idx) => (
-                          <tr key={alt.Raw_Supplier_ID || idx}>
-                            <td className="mono-cell" style={{ fontWeight: 600 }}>#{idx + 1}</td>
-                            <td>
-                              <div style={{ fontWeight: 600 }}>{alt['Supplier ID']}</div>
-                              <div style={{ fontSize: '11px', color: 'var(--text-dim)' }}>Rating: {alt['Supplier Rating']}</div>
-                            </td>
-                            <td className="mono-cell">
-                              <span style={{ fontWeight: 700, color: alt.Raw_MCDA_Score >= 70 ? 'var(--success)' : 'var(--warning)' }}>
-                                {alt['Match Score']}
-                              </span>
-                            </td>
-                            <td className="mono-cell">{alt['Lead Time']}</td>
-                            <td className="mono-cell">{alt['Available Quantity']}</td>
-                            <td className="mono-cell">₹ {Number(alt.Raw_Unit_Cost).toLocaleString('en-IN')}</td>
-                            <td className="mono-cell">
-                              <span className={alt.Downtime_Prevented_Days > 0 ? 'text-success' : 'text-dim'}>
-                                {alt.Downtime_Prevented_Days > 0 ? `+${alt.Downtime_Prevented_Days} Days` : '0 d'}
-                              </span>
-                            </td>
-                            <td className="mono-cell" style={{ fontWeight: 600, color: alt.Net_Benefit_INR > 0 ? 'var(--success)' : 'var(--text-muted)' }}>
-                              {formatCurrency(alt.Net_Benefit_INR)}
-                            </td>
-                            <td style={{ fontSize: '12px' }}>
-                              <span className={`badge ${alt.Arrives_Before_Stockout ? 'badge-safe' : (alt.Downtime_Prevented_Days > 0 ? 'badge-warning' : 'badge-danger')}`}>
-                                {alt.Arrives_Before_Stockout ? 'Prevents Shutdown' : (alt.Downtime_Prevented_Days > 0 ? 'Shortens Downtime' : 'No Lead Benefit')}
-                              </span>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                ) : (
-                  <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '13px' }}>
-                    No alternative suppliers required: current order delivery poses zero stockout risk, or no approved secondary vendor is registered for item code <strong style={{ color: 'var(--text-main)' }}>{form.item_id}</strong>.
-                  </div>
-                )}
-              </div>
+              )}
             </div>
           )}
-        </div>
-      )}
 
-      {/* TAB 2: BATCH CSV AUDIT */}
-      {activeTab === 'bulk' && (
-        <div>
-          <div className="panel">
-            <div className="panel-header">
-              <span className="panel-title">
-                <Upload size={16} />
-                Batch Purchase Order Risk Audit
-              </span>
-              <button type="button" onClick={downloadSampleCsv} className="btn-outline">
-                <Download size={14} />
-                Download Sample CSV Template
-              </button>
-            </div>
-
-            <form onSubmit={handleBulkUpload}>
-              <label className="upload-zone" style={{ display: 'block' }}>
-                <input 
-                  type="file" 
-                  accept=".csv" 
-                  style={{ display: 'none' }} 
-                  onChange={(e) => setBulkFile(e.target.files[0])}
-                />
-                <Upload size={28} className="upload-icon" />
-                <div className="upload-title">
-                  {bulkFile ? bulkFile.name : 'Select or drop a CSV file with purchase orders'}
-                </div>
-                <div className="upload-sub">
-                  Required columns: Supplier_ID, Item_ID, Order_Date, Promised_Date, Quantity_Ordered
-                </div>
-              </label>
-
-              <div className="form-actions" style={{ marginTop: 0 }}>
-                <div className="form-stats-hint">
-                  Simultaneous regression & classification scoring across up to 10,000 purchase orders
-                </div>
-                <button type="submit" className="btn-primary" disabled={bulkLoading || !bulkFile}>
-                  {bulkLoading && <span className="spinner"></span>}
-                  {bulkLoading ? 'Processing Batch...' : 'Audit Batch Orders'}
-                  {!bulkLoading && <ChevronRight size={16} />}
-                </button>
-              </div>
-            </form>
-          </div>
-
-          {bulkError && (
-            <div className="alert-box alert-danger">
-              <AlertTriangle size={18} />
-              <div><strong>Audit Error:</strong> {bulkError}</div>
-            </div>
-          )}
-
-          {bulkResult && (
+          {/* TAB 2: BATCH CSV AUDIT */}
+          {activeNav === 'bulk' && (
             <div>
-              {/* Batch Summary Strip */}
-              <div className="metrics-row">
-                <div className="metric-card">
-                  <div className="metric-label">Total Orders Audited</div>
-                  <div className="metric-value">{bulkResult.summary.total_orders.toLocaleString()}</div>
-                  <div className="metric-sub">Complete batch execution</div>
+              <div className="card">
+                <div className="card-header">
+                  <div className="card-header-left">
+                    <div className="card-icon-container">
+                      <UploadCloud size={18} />
+                    </div>
+                    <div>
+                      <div className="card-title">Batch Purchase Order Audit</div>
+                      <div className="card-subtitle">Upload a CSV file containing multiple purchase orders to audit delivery risks and delay probabilities simultaneously.</div>
+                    </div>
+                  </div>
+
+                  <button type="button" onClick={downloadSampleCsv} className="btn-secondary">
+                    <Download size={14} />
+                    Download Sample CSV Template
+                  </button>
                 </div>
 
-                <div className="metric-card">
-                  <div className="metric-label">Delayed Orders</div>
-                  <div className="metric-value text-danger">
-                    {bulkResult.summary.delayed_count.toLocaleString()}
-                  </div>
-                  <div className="metric-sub">
-                    <strong>{bulkResult.summary.delayed_pct}%</strong> of total volume
-                  </div>
-                </div>
+                <div className="card-body">
+                  <form onSubmit={handleBulkUpload}>
+                    <label className="file-dropzone" style={{ display: 'block' }}>
+                      <input 
+                        type="file" 
+                        accept=".csv" 
+                        style={{ display: 'none' }} 
+                        onChange={(e) => setBulkFile(e.target.files[0])}
+                      />
+                      <UploadCloud size={32} style={{ color: 'var(--blue-primary)', marginBottom: '10px' }} />
+                      <div style={{ fontWeight: 600, color: 'var(--text-primary)', marginBottom: '4px' }}>
+                        {bulkFile ? bulkFile.name : 'Click to browse or drop purchase order CSV file here'}
+                      </div>
+                      <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                        Required columns: Supplier_ID, Item_ID, Order_Date, Promised_Date, Quantity_Ordered
+                      </div>
+                    </label>
 
-                <div className="metric-card">
-                  <div className="metric-label">High-Risk Orders</div>
-                  <div className="metric-value text-warning">
-                    {bulkResult.summary.high_risk_count.toLocaleString()}
-                  </div>
-                  <div className="metric-sub">Urgent intervention required</div>
-                </div>
-
-                <div className="metric-card">
-                  <div className="metric-label">Average Delay</div>
-                  <div className="metric-value">
-                    {bulkResult.summary.average_delay_days.toFixed(1)} d
-                  </div>
-                  <div className="metric-sub">Mean across batch</div>
+                    <div className="form-footer" style={{ marginTop: 0 }}>
+                      <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                        Executes simultaneous XGBoost delay regression and risk classification across all rows.
+                      </div>
+                      <button type="submit" className="btn-primary" disabled={bulkLoading || !bulkFile}>
+                        {bulkLoading && <span className="loading-spinner"></span>}
+                        {bulkLoading ? 'Processing Batch...' : 'Audit Batch Orders'}
+                        {!bulkLoading && <ChevronRight size={16} />}
+                      </button>
+                    </div>
+                  </form>
                 </div>
               </div>
 
-              {/* Audited Orders Table */}
-              <div className="panel">
-                <div className="panel-header">
-                  <span className="panel-title">Audited Orders Breakdown (First 100 Entries)</span>
-                  <span className="form-label-hint">Sorted by upload order</span>
+              {bulkError && (
+                <div className="banner-alert banner-alert-danger">
+                  <AlertTriangle size={18} />
+                  <div><strong>Audit Error:</strong> {bulkError}</div>
+                </div>
+              )}
+
+              {bulkResult && (
+                <div>
+                  <div className="kpi-grid">
+                    <div className="kpi-card">
+                      <div className="kpi-title">Total Orders Audited</div>
+                      <div className="kpi-value">{bulkResult.summary.total_orders.toLocaleString()}</div>
+                      <div className="kpi-subtitle">Complete batch volume</div>
+                    </div>
+
+                    <div className="kpi-card">
+                      <div className="kpi-title">Delayed Orders</div>
+                      <div className="kpi-value" style={{ color: 'var(--danger-badge)' }}>
+                        {bulkResult.summary.delayed_count.toLocaleString()}
+                      </div>
+                      <div className="kpi-subtitle">
+                        <strong>{bulkResult.summary.delayed_pct}%</strong> delayed rate
+                      </div>
+                    </div>
+
+                    <div className="kpi-card">
+                      <div className="kpi-title">High-Risk Orders</div>
+                      <div className="kpi-value" style={{ color: 'var(--warning-badge)' }}>
+                        {bulkResult.summary.high_risk_count.toLocaleString()}
+                      </div>
+                      <div className="kpi-subtitle">Priority supplier intervention</div>
+                    </div>
+
+                    <div className="kpi-card">
+                      <div className="kpi-title">Average Delay</div>
+                      <div className="kpi-value">
+                        {bulkResult.summary.average_delay_days.toFixed(1)} Days
+                      </div>
+                      <div className="kpi-subtitle">Mean delay across batch</div>
+                    </div>
+                  </div>
+
+                  <div className="card">
+                    <div className="card-header">
+                      <div className="card-title">Audited Orders Breakdown (First 100 Rows)</div>
+                    </div>
+                    <div className="card-body" style={{ padding: 0 }}>
+                      <div className="table-container">
+                        <table className="custom-table">
+                          <thead>
+                            <tr>
+                              <th>PO Reference</th>
+                              <th>Supplier</th>
+                              <th>Part Item</th>
+                              <th>Quantity</th>
+                              <th>Predicted Delay</th>
+                              <th>Delay Probability</th>
+                              <th>Risk Tier</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {bulkResult.rows.map((row, idx) => (
+                              <tr key={idx}>
+                                <td style={{ fontWeight: 600 }}>{row.Purchase_Order_ID || `PO-${idx + 1}`}</td>
+                                <td>{row.Supplier_ID}</td>
+                                <td>{row.Item_ID}</td>
+                                <td>{Number(row.Quantity_Ordered).toLocaleString()}</td>
+                                <td>
+                                  <span style={{ fontWeight: 600, color: row.Predicted_Delay_Days > 0.5 ? 'var(--danger-badge)' : 'var(--success-badge)' }}>
+                                    {row.Predicted_Delay_Days > 0 ? `+${Number(row.Predicted_Delay_Days).toFixed(1)} d` : '0.0 d'}
+                                  </span>
+                                </td>
+                                <td>{Number(row.Delay_Probability).toFixed(1)}%</td>
+                                <td>
+                                  <span className={`badge ${row.Delivery_Risk === 'High' ? 'badge-danger' : (row.Delivery_Risk === 'Medium' ? 'badge-warning' : 'badge-success')}`}>
+                                    {row.Delivery_Risk} Risk
+                                  </span>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* TAB 3: MODEL PERFORMANCE & METRICS */}
+          {activeNav === 'models' && (
+            <div>
+              <div className="card">
+                <div className="card-header">
+                  <div className="card-header-left">
+                    <div className="card-icon-container">
+                      <BarChart3 size={18} />
+                    </div>
+                    <div>
+                      <div className="card-title">Production Model Verification & Benchmarks</div>
+                      <div className="card-subtitle">Verified on 240,000 automotive transactions with chronological 80/20 train/test holdout.</div>
+                    </div>
+                  </div>
                 </div>
 
-                <div className="table-wrapper">
-                  <table className="data-table">
-                    <thead>
-                      <tr>
-                        <th>Purchase Order</th>
-                        <th>Supplier</th>
-                        <th>Item</th>
-                        <th>Quantity</th>
-                        <th>Predicted Delay</th>
-                        <th>Delay Probability</th>
-                        <th>Risk Classification</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {bulkResult.rows.map((row, idx) => (
-                        <tr key={idx}>
-                          <td className="mono-cell" style={{ fontWeight: 600 }}>
-                            {row.Purchase_Order_ID || `PO-${idx + 1}`}
-                          </td>
-                          <td className="mono-cell">{row.Supplier_ID}</td>
-                          <td className="mono-cell">{row.Item_ID}</td>
-                          <td className="mono-cell">{Number(row.Quantity_Ordered).toLocaleString()}</td>
-                          <td className="mono-cell">
-                            <span className={row.Predicted_Delay_Days > 0.5 ? 'text-danger' : 'text-success'} style={{ fontWeight: 600 }}>
-                              {row.Predicted_Delay_Days > 0 ? `+${Number(row.Predicted_Delay_Days).toFixed(1)} d` : '0.0 d'}
-                            </span>
-                          </td>
-                          <td className="mono-cell">
-                            {Number(row.Delay_Probability).toFixed(1)}%
-                          </td>
-                          <td>
-                            <span className={`badge ${row.Delivery_Risk === 'High' ? 'badge-high' : (row.Delivery_Risk === 'Medium' ? 'badge-medium' : 'badge-low')}`}>
-                              {row.Delivery_Risk} Risk
-                            </span>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                <div className="card-body">
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '20px' }}>
+                    {/* Regressor */}
+                    <div style={{ border: '1px solid var(--border-light)', borderRadius: '6px', padding: '16px' }}>
+                      <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '12px' }}>
+                        1. Delivery Delay Regressor (`XGBRegressor`)
+                      </div>
+                      <table className="custom-table">
+                        <tbody>
+                          <tr>
+                            <td>Mean Absolute Error (MAE)</td>
+                            <td style={{ textAlign: 'right', fontWeight: 700, color: 'var(--blue-primary)' }}>1.2912 Days</td>
+                          </tr>
+                          <tr>
+                            <td>Root Mean Squared Error (RMSE)</td>
+                            <td style={{ textAlign: 'right', fontWeight: 600 }}>1.8217 Days</td>
+                          </tr>
+                          <tr>
+                            <td>R² Variance Explained</td>
+                            <td style={{ textAlign: 'right', fontWeight: 700, color: 'var(--success-badge)' }}>53.77%</td>
+                          </tr>
+                          <tr>
+                            <td>Tolerance (within ±1 Day)</td>
+                            <td style={{ textAlign: 'right', fontWeight: 600 }}>54.56%</td>
+                          </tr>
+                          <tr>
+                            <td>Tolerance (within ±2 Days)</td>
+                            <td style={{ textAlign: 'right', fontWeight: 600 }}>80.75%</td>
+                          </tr>
+                          <tr>
+                            <td>Tolerance (within ±3 Days)</td>
+                            <td style={{ textAlign: 'right', fontWeight: 600 }}>90.20%</td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+
+                    {/* Classifier */}
+                    <div style={{ border: '1px solid var(--border-light)', borderRadius: '6px', padding: '16px' }}>
+                      <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '12px' }}>
+                        2. Delivery Risk Classifier (`XGBClassifier`)
+                      </div>
+                      <table className="custom-table">
+                        <tbody>
+                          <tr>
+                            <td>Overall Classification Accuracy</td>
+                            <td style={{ textAlign: 'right', fontWeight: 700, color: 'var(--blue-primary)' }}>88.36%</td>
+                          </tr>
+                          <tr>
+                            <td>ROC-AUC Score</td>
+                            <td style={{ textAlign: 'right', fontWeight: 700, color: 'var(--success-badge)' }}>0.9301</td>
+                          </tr>
+                          <tr>
+                            <td>Delayed Class Recall</td>
+                            <td style={{ textAlign: 'right', fontWeight: 600 }}>73.06% (Catches delays)</td>
+                          </tr>
+                          <tr>
+                            <td>Delayed Class Precision</td>
+                            <td style={{ textAlign: 'right', fontWeight: 600 }}>85.28%</td>
+                          </tr>
+                          <tr>
+                            <td>Calibrated F1-Score</td>
+                            <td style={{ textAlign: 'right', fontWeight: 600 }}>0.7870</td>
+                          </tr>
+                          <tr>
+                            <td>Alternative Supplier Accuracy</td>
+                            <td style={{ textAlign: 'right', fontWeight: 600 }}>99.96% (MCDA Engine)</td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  <div style={{ backgroundColor: 'var(--bg-subtle)', borderRadius: '6px', padding: '14px 18px', fontSize: '13px', color: 'var(--text-secondary)' }}>
+                    <strong>MCDA Decision Weighting Formula:</strong> Alternative supplier scoring uses a 5-factor composite metric: 
+                    <code>MCDA Score = 0.35 × S_LeadTime + 0.25 × S_Financial + 0.20 × S_Reliability + 0.10 × S_Rating + 0.10 × S_Quantity</code>. 
+                    This ensures suppliers that prevent factory line shutdowns with positive net financial benefit are ranked highest.
+                  </div>
                 </div>
               </div>
             </div>
           )}
-        </div>
-      )}
+        </main>
+      </div>
     </div>
   );
 }
