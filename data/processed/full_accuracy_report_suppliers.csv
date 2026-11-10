@@ -1,0 +1,4 @@
+Dataset,Total_Rows,Reg_MAE_Days,Reg_RMSE_Days,Reg_R2_%,Within_1d_%,Within_2d_%,Within_3d_%,Clf_Accuracy_%,Clf_ROC_AUC,Clf_Precision_%,Clf_Recall_%,Clf_F1,TN,FP,FN,TP
+Combined 240k (48k Holdout Test Set),48000,1.2912,1.8217,53.77,54.56,80.75,90.2,88.36,0.9301,85.28,73.06,0.787,32097,1781,3804,10318
+90k Raw Historical Delivery Data,90000,0.6356,1.0467,84.69,82.17,94.37,97.69,96.83,0.9882,96.1,92.97,0.9451,62608,997,1856,24539
+150k Synthetic Delivery (30k Holdout),30000,1.2409,1.7382,58.38,55.8,82.11,90.98,90.58,0.9529,89.39,77.34,0.8293,20310,815,2011,6864

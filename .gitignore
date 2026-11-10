@@ -30,3 +30,7 @@ desktop.ini
 *.log
 scratch/
 
+# Node.js
+node_modules/
+frontend/node_modules/
+
