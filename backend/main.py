@@ -208,6 +208,27 @@ async def audit_bulk_orders(file: UploadFile = File(...)):
         if missing:
             raise HTTPException(status_code=400, detail=f"Missing required columns in CSV: {missing}")
         
+        # Auto-enrich missing static profile columns from historical templates
+        templates = get_templates()
+        static_cols = [c for c in templates.columns if c not in required_cols and c in templates.columns]
+        missing_static = [c for c in static_cols if c not in uploaded_df.columns]
+        
+        if missing_static:
+            cols_to_pull = ["Supplier_ID", "Item_ID"] + [c for c in missing_static if c not in ["Supplier_ID", "Item_ID"]]
+            enriched = pd.merge(uploaded_df, templates[cols_to_pull].drop_duplicates(["Supplier_ID", "Item_ID"]), on=["Supplier_ID", "Item_ID"], how="left")
+            
+            # Fallback for any unmatched pairs using Supplier_ID alone
+            unmatched = enriched[missing_static[0]].isna()
+            if unmatched.any():
+                sup_defaults = templates.groupby("Supplier_ID")[missing_static].first().reset_index()
+                filled_unmatched = pd.merge(enriched[unmatched].drop(columns=missing_static), sup_defaults, on="Supplier_ID", how="left")
+                enriched = pd.concat([enriched[~unmatched], filled_unmatched], ignore_index=True)
+            
+            # Impute any remaining NaNs with column medians/modes
+            numeric_defaults = templates.median(numeric_only=True)
+            enriched = enriched.fillna(numeric_defaults)
+            uploaded_df = enriched
+
         preds = predict.predict_orders(uploaded_df)
         
         total_orders = len(preds)
