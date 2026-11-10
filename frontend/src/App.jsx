@@ -142,18 +142,60 @@ export default function App() {
 
   const downloadSampleCsv = () => {
     const csvContent = 
-`Purchase_Order_ID,Supplier_ID,Item_ID,Order_Date,Promised_Date,Quantity_Ordered,Unit_Cost,Shipping_Cost,Distance_KM,Supplier_History_Delivery_Rate,Order_Lead_Time_Days
-PO-2001,SUP-001,ENG01,${todayStr},${defaultPromisedStr},600,4500,2800,450,91.2,10
-PO-2002,SUP-002,BRK02,${todayStr},${defaultPromisedStr},350,1850,1500,320,68.4,10
-PO-2003,SUP-003,TRN03,${todayStr},${defaultPromisedStr},150,12000,4200,780,88.0,10
-PO-2004,SUP-004,ELE04,${todayStr},${defaultPromisedStr},900,650,1100,210,95.5,10
-PO-2005,SUP-005,ENG01,${todayStr},${defaultPromisedStr},450,4700,3100,560,54.2,10`;
+`Purchase_Order_ID,Supplier_ID,Item_ID,Order_Date,Promised_Date,Quantity_Ordered,Unit_Cost,Shipping_Cost,Distance_KM,Shipping_Method,Supplier_History_Delivery_Rate,Order_Lead_Time_Days
+PO-2001,SUP-001,ENG01,${todayStr},${defaultPromisedStr},600,4500,2800,450,Road,91.2,10
+PO-2002,SUP-002,BRK01,${todayStr},${defaultPromisedStr},350,1850,1500,320,Rail,68.4,8
+PO-2003,SUP-003,GEAR01,${todayStr},${defaultPromisedStr},150,12000,4200,780,Sea,88.0,15
+PO-2004,SUP-004,ECU01,${todayStr},${defaultPromisedStr},900,650,1100,210,Air,95.5,5
+PO-2005,SUP-005,SUSP01,${todayStr},${defaultPromisedStr},450,4700,3100,560,Road,54.2,12`;
 
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.setAttribute('href', url);
     link.setAttribute('download', 'purchase_orders_template.csv');
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const exportAuditedCsv = () => {
+    if (!bulkResult || !bulkResult.rows || bulkResult.rows.length === 0) return;
+
+    const headers = [
+      'Purchase_Order_ID',
+      'Supplier_ID',
+      'Item_ID',
+      'Quantity_Ordered',
+      'Predicted_Delay_Days',
+      'Delay_Probability_Pct',
+      'Delivery_Risk',
+      'Best_Alternative_Supplier',
+      'Alternative_Match_Score',
+      'Alternative_Lead_Time',
+      'Alternative_Feasibility'
+    ];
+
+    const rows = bulkResult.rows.map(r => [
+      r.Purchase_Order_ID || '',
+      r.Supplier_ID || '',
+      r.Item_ID || '',
+      r.Quantity_Ordered || 0,
+      r.Predicted_Delay_Days || 0,
+      r.Delay_Probability || 0,
+      r.Delivery_Risk || '',
+      `"${r.Best_Alternative_Supplier || 'None'}"`,
+      r.Alternative_Match_Score || '-',
+      r.Alternative_Lead_Time || '-',
+      `"${r.Alternative_Feasibility || 'On Track'}"`
+    ]);
+
+    const csvContent = [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', 'audited_orders_with_alternatives.csv');
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -800,8 +842,15 @@ PO-2005,SUP-005,ENG01,${todayStr},${defaultPromisedStr},450,4700,3100,560,54.2,1
                   </div>
 
                   <div className="card">
-                    <div className="card-header">
-                      <div className="card-title">Audited Orders Breakdown (First 100 Rows)</div>
+                    <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div>
+                        <div className="card-title">Audited Orders Breakdown</div>
+                        <div className="card-subtitle">Showing predicted delays, risk tiers, and recommended substitute suppliers for at-risk orders.</div>
+                      </div>
+                      <button type="button" onClick={exportAuditedCsv} className="btn-secondary" style={{ padding: '6px 12px', fontSize: '13px' }}>
+                        <Download size={14} />
+                        Export Audited CSV
+                      </button>
                     </div>
                     <div className="card-body" style={{ padding: 0 }}>
                       <div className="table-container">
@@ -815,6 +864,7 @@ PO-2005,SUP-005,ENG01,${todayStr},${defaultPromisedStr},450,4700,3100,560,54.2,1
                               <th>Predicted Delay</th>
                               <th>Delay Probability</th>
                               <th>Risk Tier</th>
+                              <th>Alternative Supplier Recommendation</th>
                             </tr>
                           </thead>
                           <tbody>
@@ -834,6 +884,23 @@ PO-2005,SUP-005,ENG01,${todayStr},${defaultPromisedStr},450,4700,3100,560,54.2,1
                                   <span className={`badge ${row.Delivery_Risk === 'High' ? 'badge-danger' : (row.Delivery_Risk === 'Medium' ? 'badge-warning' : 'badge-success')}`}>
                                     {row.Delivery_Risk} Risk
                                   </span>
+                                </td>
+                                <td>
+                                  {row.Has_Alternative ? (
+                                    <div>
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                        <strong style={{ color: 'var(--text-primary)' }}>{row.Best_Alternative_Supplier}</strong>
+                                        <span className="badge badge-blue" style={{ fontSize: '10px', padding: '1px 5px' }}>{row.Alternative_Match_Score}</span>
+                                      </div>
+                                      <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
+                                        Lead: {row.Alternative_Lead_Time} • <span style={{ color: row.Alternative_Feasibility === 'Prevents Shutdown' ? 'var(--success-text)' : 'var(--warning-text)', fontWeight: 600 }}>{row.Alternative_Feasibility}</span>
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <span style={{ color: 'var(--text-muted)', fontSize: '12px' }}>
+                                      {row.Predicted_Delay_Days > 0.5 ? 'No Alt Registered' : 'On Track (None Needed)'}
+                                    </span>
+                                  )}
                                 </td>
                               </tr>
                             ))}
