@@ -237,6 +237,107 @@ async def audit_bulk_orders(file: UploadFile = File(...)):
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Bulk audit error: {str(e)}")
 
+# Mount reports/figures static directory
+FIGURES_DIR = BASE_DIR / "reports" / "figures"
+if FIGURES_DIR.exists():
+    app.mount("/api/reports/figures", StaticFiles(directory=str(FIGURES_DIR)), name="report_figures")
+
+@app.get("/api/reports/list")
+def list_reports():
+    return [
+        {
+            "id": "tolerance",
+            "title": "Tolerance Accuracy Curve (±1 to ±5 Days)",
+            "category": "Regression Analysis",
+            "filename": "04_tolerance_accuracy_curve.png",
+            "description": "Tolerance curve showing 54.56% within ±1 day, 80.75% within ±2 days, and 90.20% within ±3 days."
+        },
+        {
+            "id": "actual_vs_pred",
+            "title": "Actual vs. Predicted Delay Regression",
+            "category": "Regression Analysis",
+            "filename": "01_actual_vs_predicted_regression.png",
+            "description": "Scatter plot and density contours of actual vs. predicted delay days across 48,000 holdout test orders (MAE = 1.29d, R² = 53.77%)."
+        },
+        {
+            "id": "residuals",
+            "title": "Residuals & Heteroscedasticity Analysis",
+            "category": "Regression Analysis",
+            "filename": "02_residuals_analysis.png",
+            "description": "Distribution of prediction residuals showing zero-centered symmetry and variance consistency."
+        },
+        {
+            "id": "qq_plot",
+            "title": "Q-Q Normal Probability Plot of Residuals",
+            "category": "Regression Analysis",
+            "filename": "03_qq_plot_residuals.png",
+            "description": "Quantile-Quantile plot comparing model residual distribution against standard normal theoretical quantiles."
+        },
+        {
+            "id": "roc_curve",
+            "title": "ROC-AUC Discrimination Curve",
+            "category": "Classification & Risk",
+            "filename": "06_roc_curve.png",
+            "description": "Receiver Operating Characteristic curve achieving 0.9301 ROC-AUC area on chronological test data."
+        },
+        {
+            "id": "precision_recall",
+            "title": "Precision-Recall Curve (Calibrated t = 0.38)",
+            "category": "Classification & Risk",
+            "filename": "07_precision_recall_curve.png",
+            "description": "Precision-Recall tradeoff demonstrating 85.28% precision and 73.06% delay recall at operational decision threshold."
+        },
+        {
+            "id": "confusion_matrix",
+            "title": "Calibrated Confusion Matrix",
+            "category": "Classification & Risk",
+            "filename": "05_confusion_matrix.png",
+            "description": "48,000-order confusion matrix showing 10,318 delayed shipments successfully caught by the risk pipeline."
+        },
+        {
+            "id": "probability_dist",
+            "title": "Probability Distribution Separation",
+            "category": "Classification & Risk",
+            "filename": "08_probability_distribution_separation.png",
+            "description": "Separation density plot between on-time and delayed shipments confirming distinct probability peaks."
+        },
+        {
+            "id": "calibration_curve",
+            "title": "Reliability & Calibration Curve",
+            "category": "Classification & Risk",
+            "filename": "09_calibration_curve.png",
+            "description": "Empirical vs. predicted probability reliability diagram proving calibrated risk scores."
+        },
+        {
+            "id": "feature_importance",
+            "title": "Top-20 Feature Importances (Both Models)",
+            "category": "Feature Analysis",
+            "filename": "feature_importance_both_models.png",
+            "description": "Side-by-side executive feature ranking for Delivery Delay Regressor vs. Risk Classifier."
+        },
+        {
+            "id": "feature_fatigue",
+            "title": "Feature Fatigue & Cumulative Explanatory Power",
+            "category": "Feature Analysis",
+            "filename": "feature_fatigue_curves_both_models.png",
+            "description": "Cumulative variance curve showing top 15 features contribute >85% of total predictive power."
+        },
+        {
+            "id": "scaling_curves",
+            "title": "Incremental Training Data Scaling Curves",
+            "category": "Data Scaling",
+            "filename": "11_incremental_data_scaling_curves.png",
+            "description": "Accuracy progression across incremental dataset sizes (10k -> 30k -> 50k -> 75k -> 100k -> 240k)."
+        },
+        {
+            "id": "correlation_heatmap",
+            "title": "Engineered Feature Correlation Heatmap",
+            "category": "Data Scaling",
+            "filename": "10_feature_correlation_heatmap.png",
+            "description": "Pearson correlation matrix across temporal, route velocity, and volume stress features."
+        }
+    ]
+
 # Mount static frontend build if it exists
 DIST_DIR = BASE_DIR / "frontend" / "dist"
 if DIST_DIR.exists():

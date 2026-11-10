@@ -13,14 +13,111 @@ import {
   ChevronRight, 
   Building2, 
   CheckCircle2, 
-  Info,
-  Calendar,
-  Layers,
-  Activity
+  Activity,
+  Image as ImageIcon,
+  Maximize2,
+  X
 } from 'lucide-react';
+
+const STATIC_REPORTS = [
+  {
+    id: "tolerance",
+    title: "Tolerance Accuracy Curve (±1 to ±5 Days)",
+    category: "Regression Analysis",
+    filename: "04_tolerance_accuracy_curve.png",
+    description: "Evaluates exact delivery error bounds: 54.56% of predictions arrive within ±1 day, 80.75% within ±2 days, and 90.20% within ±3 days of actual arrival."
+  },
+  {
+    id: "actual_vs_pred",
+    title: "Actual vs. Predicted Delay Days",
+    category: "Regression Analysis",
+    filename: "01_actual_vs_predicted_regression.png",
+    description: "Scatter plot and 2D density contours across 48,000 chronological holdout test orders (MAE = 1.2912 Days, R² = 53.77% variance explained)."
+  },
+  {
+    id: "residuals",
+    title: "Residuals & Heteroscedasticity Analysis",
+    category: "Regression Analysis",
+    filename: "02_residuals_analysis.png",
+    description: "Residual error distribution confirming zero-centered symmetry, low variance drift, and well-behaved error bounds across lead times."
+  },
+  {
+    id: "qq_plot",
+    title: "Q-Q Normal Probability Plot",
+    category: "Regression Analysis",
+    filename: "03_qq_plot_residuals.png",
+    description: "Quantile-Quantile plot comparing empirical model residuals against standard theoretical normal quantiles."
+  },
+  {
+    id: "roc_curve",
+    title: "ROC-AUC Discrimination Curve",
+    category: "Classification & Risk",
+    filename: "06_roc_curve.png",
+    description: "Receiver Operating Characteristic curve achieving 0.9301 ROC-AUC score on strict chronological out-of-time test data."
+  },
+  {
+    id: "precision_recall",
+    title: "Precision-Recall Curve (Threshold Calibrated)",
+    category: "Classification & Risk",
+    filename: "07_precision_recall_curve.png",
+    description: "Precision-Recall curve demonstrating 85.28% precision and 73.06% delay recall at calibrated operational threshold (t = 0.38)."
+  },
+  {
+    id: "confusion_matrix",
+    title: "Calibrated Confusion Matrix",
+    category: "Classification & Risk",
+    filename: "05_confusion_matrix.png",
+    description: "48,000-order holdout confusion matrix showing 10,318 delayed shipments successfully caught with minimal false positives."
+  },
+  {
+    id: "probability_dist",
+    title: "Probability Distribution Separation",
+    category: "Classification & Risk",
+    filename: "08_probability_distribution_separation.png",
+    description: "Kernel density estimation showing distinct separation between on-time deliveries (<20% probability) and at-risk shipments (>70%)."
+  },
+  {
+    id: "calibration_curve",
+    title: "Reliability & Calibration Curve",
+    category: "Classification & Risk",
+    filename: "09_calibration_curve.png",
+    description: "Empirical vs. predicted probability reliability diagram verifying that predicted probabilities reflect true real-world delay rates."
+  },
+  {
+    id: "feature_importance",
+    title: "Top-20 Feature Importances (Both Models)",
+    category: "Feature Analysis",
+    filename: "feature_importance_both_models.png",
+    description: "Side-by-side feature attribution comparison for the Delivery Delay Regressor and Delivery Risk Classifier."
+  },
+  {
+    id: "feature_fatigue",
+    title: "Feature Fatigue & Cumulative Variance Curves",
+    category: "Feature Analysis",
+    filename: "feature_fatigue_curves_both_models.png",
+    description: "Cumulative explanatory power curves demonstrating that the top 15 engineered features explain >85% of total predictive variance."
+  },
+  {
+    id: "scaling_curves",
+    title: "Incremental Data Scaling Curves",
+    category: "Data Scaling",
+    filename: "11_incremental_data_scaling_curves.png",
+    description: "Model accuracy progression across incremental dataset sizes (10k -> 30k -> 50k -> 75k -> 100k -> 240k total records)."
+  },
+  {
+    id: "correlation_heatmap",
+    title: "Engineered Feature Correlation Heatmap",
+    category: "Data Scaling",
+    filename: "10_feature_correlation_heatmap.png",
+    description: "Pearson correlation matrix across temporal dynamics, route transit velocities, and volume stress interaction ratios."
+  }
+];
 
 export default function App() {
   const [activeNav, setActiveNav] = useState('single');
+  const [reportFilter, setReportFilter] = useState('All');
+  const [selectedImage, setSelectedImage] = useState(null);
+
   const [meta, setMeta] = useState({
     suppliers: [],
     items: [],
@@ -167,6 +264,10 @@ PO-2005,SUP-005,ENG01,${todayStr},${defaultPromisedStr},450,4700,3100,560,54.2,1
     return `₹ ${Number(val).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`;
   };
 
+  const filteredReports = reportFilter === 'All' 
+    ? STATIC_REPORTS 
+    : STATIC_REPORTS.filter(r => r.category.toLowerCase().includes(reportFilter.toLowerCase()));
+
   return (
     <div className="dashboard-layout">
       {/* LEFT SIDEBAR */}
@@ -201,7 +302,7 @@ PO-2005,SUP-005,ENG01,${todayStr},${defaultPromisedStr},450,4700,3100,560,54.2,1
             <span>Batch CSV Audit</span>
           </button>
 
-          <div className="nav-section-title" style={{ marginTop: '16px' }}>Diagnostics</div>
+          <div className="nav-section-title" style={{ marginTop: '16px' }}>Diagnostics & Reports</div>
           <button 
             type="button"
             className={`nav-item ${activeNav === 'models' ? 'active' : ''}`}
@@ -209,6 +310,15 @@ PO-2005,SUP-005,ENG01,${todayStr},${defaultPromisedStr},450,4700,3100,560,54.2,1
           >
             <BarChart3 size={16} className="nav-icon" />
             <span>Model Performance</span>
+          </button>
+
+          <button 
+            type="button"
+            className={`nav-item ${activeNav === 'reports' ? 'active' : ''}`}
+            onClick={() => setActiveNav('reports')}
+          >
+            <ImageIcon size={16} className="nav-icon" />
+            <span>Diagnostic Reports</span>
           </button>
         </nav>
 
@@ -233,7 +343,8 @@ PO-2005,SUP-005,ENG01,${todayStr},${defaultPromisedStr},450,4700,3100,560,54.2,1
             <span className="header-title-bold">
               {activeNav === 'single' && 'Purchase Order Delivery Risk Assessment'}
               {activeNav === 'bulk' && 'Batch Purchase Order Risk Audit'}
-              {activeNav === 'models' && 'Machine Learning Model Benchmarks & Metrics'}
+              {activeNav === 'models' && 'Model Performance & Benchmark Scorecards'}
+              {activeNav === 'reports' && 'Machine Learning Diagnostic Reports & Figures'}
             </span>
           </div>
 
@@ -875,6 +986,15 @@ PO-2005,SUP-005,ENG01,${todayStr},${defaultPromisedStr},450,4700,3100,560,54.2,1
                       <div className="card-subtitle">Verified on 240,000 automotive transactions with chronological 80/20 train/test holdout.</div>
                     </div>
                   </div>
+
+                  <button 
+                    type="button" 
+                    className="btn-primary" 
+                    onClick={() => setActiveNav('reports')}
+                  >
+                    <ImageIcon size={15} />
+                    View All 13 Diagnostic Figures
+                  </button>
                 </div>
 
                 <div className="card-body">
@@ -959,8 +1079,109 @@ PO-2005,SUP-005,ENG01,${todayStr},${defaultPromisedStr},450,4700,3100,560,54.2,1
               </div>
             </div>
           )}
+
+          {/* TAB 4: DIAGNOSTIC REPORTS & FIGURES */}
+          {activeNav === 'reports' && (
+            <div>
+              <div className="card">
+                <div className="card-header">
+                  <div className="card-header-left">
+                    <div className="card-icon-container">
+                      <ImageIcon size={18} />
+                    </div>
+                    <div>
+                      <div className="card-title">Machine Learning Diagnostic Reports & Figures</div>
+                      <div className="card-subtitle">Generated figures from <code>reports/figures</code> evaluating regression residuals, ROC curves, calibration, and feature fatigue.</div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="card-body">
+                  {/* Filter Pills */}
+                  <div className="filter-bar">
+                    {['All', 'Regression', 'Classification', 'Feature', 'Scaling'].map((cat) => (
+                      <button
+                        key={cat}
+                        type="button"
+                        className={`filter-pill ${reportFilter === cat ? 'active' : ''}`}
+                        onClick={() => setReportFilter(cat)}
+                      >
+                        {cat === 'All' ? `All Reports (${STATIC_REPORTS.length})` : cat}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Reports Grid */}
+                  <div className="reports-grid">
+                    {filteredReports.map((report) => (
+                      <div key={report.id} className="report-card">
+                        <div 
+                          className="report-img-wrapper"
+                          onClick={() => setSelectedImage(report)}
+                          title="Click to expand"
+                        >
+                          <img 
+                            src={`/figures/${report.filename}`} 
+                            alt={report.title}
+                            onError={(e) => {
+                              // Fallback to backend API static mount if needed
+                              e.currentTarget.src = `/api/reports/figures/${report.filename}`;
+                            }}
+                          />
+                          <div className="report-img-overlay">
+                            <Maximize2 size={12} />
+                            <span>Enlarge</span>
+                          </div>
+                        </div>
+
+                        <div className="report-card-body">
+                          <span className="report-category-badge">{report.category}</span>
+                          <h4 className="report-card-title">{report.title}</h4>
+                          <p className="report-card-description">{report.description}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </main>
       </div>
+
+      {/* LIGHTBOX MODAL */}
+      {selectedImage && (
+        <div className="modal-backdrop" onClick={() => setSelectedImage(null)}>
+          <div className="modal-container" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <div>
+                <span className="badge badge-blue" style={{ marginBottom: '4px' }}>{selectedImage.category}</span>
+                <div className="modal-title">{selectedImage.title}</div>
+              </div>
+              <button 
+                type="button" 
+                className="modal-close-btn"
+                onClick={() => setSelectedImage(null)}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="modal-body">
+              <img 
+                src={`/figures/${selectedImage.filename}`} 
+                alt={selectedImage.title}
+                onError={(e) => {
+                  e.currentTarget.src = `/api/reports/figures/${selectedImage.filename}`;
+                }}
+              />
+              <div className="modal-caption">
+                {selectedImage.description}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
