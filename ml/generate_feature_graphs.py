@@ -5,11 +5,8 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 # 1. Load both production pipelines
-delay_pipe_path = "models/combined_delivery_delay_pipeline.pkl"
-risk_pipe_path = "models/combined_delivery_risk_pipeline.pkl"
-
-delay_pipeline = joblib.load(delay_pipe_path)
-risk_pipeline = joblib.load(risk_pipe_path)
+from ml.predict import load_models
+delay_pipeline, risk_pipeline = load_models()
 
 def clean_feature_name(name):
     """Clean sklearn ColumnTransformer output names for executive presentation."""

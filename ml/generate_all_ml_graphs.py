@@ -17,10 +17,9 @@ plt.style.use("seaborn-v0_8-whitegrid" if "seaborn-v0_8-whitegrid" in plt.style.
 plt.rcParams.update({"font.size": 10, "figure.autolayout": True})
 
 print("1. Loading Models and Holdout Test Data...")
-from predict import prepare_features
+from ml.predict import prepare_features, load_models
 
-delay_pipeline = joblib.load("models/combined_delivery_delay_pipeline.pkl")
-risk_pipeline = joblib.load("models/combined_delivery_risk_pipeline.pkl")
+delay_pipeline, risk_pipeline = load_models()
 
 # Load holdout test data (last 20% chronological split of combined dataset)
 df = pd.read_csv("data/processed/combined_supplier_delivery_data.csv")

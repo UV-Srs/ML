@@ -15,7 +15,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-import predict
+try:
+    from ml import predict
+except ImportError:
+    import predict
 
 app = FastAPI(
     title="Supply Chain Delivery Delay & Production Loss API",
@@ -241,4 +244,5 @@ if DIST_DIR.exists():
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+    app_target = "backend.main:app" if Path("backend").exists() else "main:app"
+    uvicorn.run(app_target, host="0.0.0.0", port=8000, reload=True)
